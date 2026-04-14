@@ -41,23 +41,23 @@ export default function AdminDashboard() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
         <div>
-          <h2 className="text-4xl font-black text-gray-800 mb-2">Admin Control Center</h2>
-          <p className="text-gray-600">Comprehensive operations analytics & insights</p>
+          <h2 className="text-2xl sm:text-4xl font-black text-gray-800 mb-2">Admin Control Center</h2>
+          <p className="text-gray-600 text-sm sm:text-base">Comprehensive operations analytics & insights</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
           <input
             type="date"
             value={dateRange.startDate}
-            onChange={e => setDateRange({ ...dateRange, startDate: e.target.value })}
+            onChange={e => setDateRange({...dateRange, startDate: e.target.value})}
             className="px-4 py-2 border-2 border-gray-300 rounded-xl focus:border-green-500 outline-none"
           />
-          <span className="flex items-center text-gray-500">to</span>
+          <span className="hidden sm:flex items-center text-gray-500">to</span>
           <input
             type="date"
             value={dateRange.endDate}
-            onChange={e => setDateRange({ ...dateRange, endDate: e.target.value })}
+            onChange={e => setDateRange({...dateRange, endDate: e.target.value})}
             className="px-4 py-2 border-2 border-gray-300 rounded-xl focus:border-green-500 outline-none"
           />
         </div>
@@ -180,7 +180,7 @@ function OverviewTab({ data, colors }) {
             <div className="mt-4 px-4">
               <p className="text-sm text-gray-500 font-semibold">Recent Messages ({data.adminMessages.length})</p>
               <div className="mt-2 grid gap-2">
-                {data.adminMessages.slice(0, 3).map(m => (
+                {data.adminMessages.slice(0,3).map(m => (
                   <div key={m._id} className="text-xs text-gray-700 bg-gray-50 p-2 rounded">
                     <div className="font-semibold">{m.officerName || 'Officer'}</div>
                     <div className="truncate">{m.text}</div>
@@ -590,7 +590,7 @@ function MeetingRow({ meeting }) {
 
   return (
     <div className="p-4 border-b border-gray-100 hover:bg-gray-50 transition-colors">
-      <div className="flex justify-between items-start mb-2">
+      <div className="flex justify-between items-start mb-2 gap-4">
         <div className="flex-1">
           <p className="font-bold text-gray-800">{meeting.userId?.name || "Field Officer"}</p>
           <p className="text-sm text-gray-600">{meeting.category || "N/A"} • {meeting.village || 'N/A'}</p>
@@ -625,24 +625,11 @@ function SaleRow({ sale }) {
   return (
     <div className="p-4 border-b border-gray-100 hover:bg-gray-50 transition-colors">
       <div className="flex justify-between items-start mb-2">
-        <div className="flex-1 flex items-center gap-3">
-          <div className="w-10 h-10 flex-shrink-0 bg-gray-50 rounded-lg flex items-center justify-center overflow-hidden border border-gray-200">
-            {sale.productName.toLowerCase().includes("bovi") || sale.productName.toLowerCase().includes("mineral") ? (
-              <img
-                src="https://m.media-amazon.com/images/I/41ZJ0uMz6CL._SX300_SY300_.jpg"
-                alt={sale.productName}
-                className="h-full w-full object-contain mix-blend-multiply"
-              />
-            ) : (
-              <span className="text-xl">📦</span>
-            )}
-          </div>
-          <div>
-            <p className="font-bold text-gray-800">{sale.productName}</p>
-            <p className="text-sm text-gray-600">
-              {sale.quantity} × {sale.packSize} • {sale.saleType === 'B2C' ? sale.farmerName : sale.distributorName}
-            </p>
-          </div>
+        <div className="flex-1">
+          <p className="font-bold text-gray-800">{sale.productName}</p>
+          <p className="text-sm text-gray-600">
+            {sale.quantity} × {sale.packSize} • {sale.saleType === 'B2C' ? sale.farmerName : sale.distributorName}
+          </p>
         </div>
         <div className="text-right">
           <p className="text-lg font-black text-green-700">₹{sale.totalAmount.toLocaleString()}</p>
@@ -701,26 +688,26 @@ function OfficerPerformanceRow({ officer, data }) {
 
   return (
     <div className="p-4 border-b border-gray-100 hover:bg-gray-50 transition-colors">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <p className="font-bold text-gray-800">{officer.name}</p>
           <p className="text-sm text-gray-600">{officer.state}, {officer.district}</p>
         </div>
-        <div className="flex gap-6 text-center">
+        <div className="grid grid-cols-2 sm:flex gap-4 sm:gap-6 text-center w-full sm:w-auto">
           <div>
-            <p className="text-2xl font-black text-purple-600">{officerMeetings}</p>
+            <p className="text-lg sm:text-2xl font-black text-purple-600">{officerMeetings}</p>
             <p className="text-xs text-gray-500">Meetings</p>
           </div>
           <div>
-            <p className="text-2xl font-black text-green-600">{officerSales.length}</p>
+            <p className="text-lg sm:text-2xl font-black text-green-600">{officerSales.length}</p>
             <p className="text-xs text-gray-500">Sales</p>
           </div>
           <div>
-            <p className="text-2xl font-black text-blue-600">₹{revenue.toLocaleString()}</p>
+            <p className="text-lg sm:text-2xl font-black text-blue-600">₹{revenue.toLocaleString()}</p>
             <p className="text-xs text-gray-500">Revenue</p>
           </div>
           <div>
-            <p className="text-2xl font-black text-orange-600">{totalDistance.toFixed(2)}</p>
+            <p className="text-lg sm:text-2xl font-black text-orange-600">{totalDistance.toFixed(2)}</p>
             <p className="text-xs text-gray-500">km Travelled</p>
           </div>
         </div>

@@ -4,18 +4,18 @@ import cors from "cors"
 import http from "http"
 import { Server } from "socket.io"
 
-import { connectDB } from "./models.js"
-import { Location, AdminMessage } from "./models.js"   // 🔥 Needed for tracking DB
+import { connectDB } from "./models/index.js"
+import { Location, AdminMessage } from "./models/index.js"   // 🔥 Needed for tracking DB
 import { geoFenceCheck } from "./geoFence.js" // 🔥 Create file if not yet
 
 console.log("1. Importing routes...")
-import authRoutes from "./routes.auth.js"
+import authRoutes from "./routes/auth.js"
 console.log("2. Auth routes imported")
-import adminRoutes from "./routes.admin.js"
+import adminRoutes from "./routes/admin.js"
 console.log("3. Admin routes imported")
-import fieldRoutes from "./routes.field.js"
+import fieldRoutes from "./routes/field.js"
 console.log("4. Field routes imported")
-import inventoryRoutes from "./routes.inventory.js"
+import inventoryRoutes from "./routes/inventory.js"
 console.log("5. Inventory routes imported")
 
 const app = express()

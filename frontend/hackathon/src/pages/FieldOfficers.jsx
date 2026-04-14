@@ -72,11 +72,11 @@ export default function FieldOfficers() {
                             >
                                 <ArrowLeft size={24} className="text-gray-600" />
                             </button>
-                            <h1 className="text-xl font-bold text-gray-900">Field Officer Tracking</h1>
+                            <h1 className="text-lg sm:text-xl font-bold text-gray-900 truncate">Field Officer Tracking</h1>
                         </div>
 
                         <div className="flex items-center gap-4">
-                            <div className="hidden sm:flex items-center gap-2 bg-blue-50 px-3 py-1 rounded-full text-blue-700 text-sm font-medium">
+                            <div className="flex items-center gap-2 bg-blue-50 px-3 py-1 rounded-full text-blue-700 text-xs sm:text-sm font-medium">
                                 <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
                                 Active: {stats.active}/{stats.total}
                             </div>

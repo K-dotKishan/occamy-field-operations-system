@@ -2384,7 +2384,26 @@ function EnhancedOrderModal({ product, onClose, onSuccess }) {
               {/* Payment Method */}
               <div className="mb-6">
                 <label className="block text-sm font-bold text-gray-700 mb-3">Payment Method</label>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                  <button
+                    onClick={() => navigate('/admin/field-officers')}
+                    className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-all flex flex-col items-center gap-2 group"
+                  >
+                    <div className="bg-blue-50 p-3 rounded-full group-hover:bg-blue-100 transition-colors">
+                      <Users size={24} className="text-blue-600" />
+                    </div>
+                    <span className="font-semibold text-gray-700 text-sm">Field Officers</span>
+                  </button>
+
+                  <button
+                    onClick={() => navigate('/admin-charts')}
+                    className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-all flex flex-col items-center gap-2 group"
+                  >
+                    <div className="bg-green-50 p-3 rounded-full group-hover:bg-green-100 transition-colors">
+                      <BarChart3 size={24} className="text-green-600" />
+                    </div>
+                    <span className="font-semibold text-gray-700 text-sm">Analytics</span>
+                  </button>
                   <button
                     onClick={() => setPaymentMethod("COD")}
                     className={`p-4 rounded-xl border-2 transition-all duration-300 flex flex-col items-center gap-2 ${paymentMethod === "COD"
