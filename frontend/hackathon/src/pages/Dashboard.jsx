@@ -232,7 +232,9 @@ export default function Dashboard() {
   const loadAdminData = async () => {
     setLoadingAdmin(true)
     try {
-      const data = await api("/admin/dashboard")
+      // Pass wide date range to get ALL historical data (not just last 30 days)
+      const today = new Date().toISOString().split('T')[0]
+      const data = await api(`/admin/dashboard?startDate=2000-01-01&endDate=${today}`)
       setAdminData(data || {})
     } catch (error) {
       console.error("Failed to load admin data:", error)
