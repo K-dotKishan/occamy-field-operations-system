@@ -1,7 +1,7 @@
 🚀 Occamy
 Field Operations Tracking & Distribution Management System
 
-📱 Mobile-First. Rural-Ready. Scalable.
+📱 Mobile-First. Rural-Ready.  Scalable.
 
 Occamy is a mobile-first internal operations platform designed to replace unstructured WhatsApp-based tracking for rural field operations.
 
@@ -11,7 +11,7 @@ Smooth performance in low connectivity areas
 
 Simple workflows for low digital literacy users
 
-Structured, verifiable activity tracking
+Structured, verifiable activity tracking,
 
 Scalable deployment across regions
 
