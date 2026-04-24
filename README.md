@@ -1,5 +1,5 @@
 🚀 Occamy
-Field Operations Tracking & Distribution Management System
+Field Operations Tracking & Distribution Management System.
 
 📱 Mobile-First. Rural-Ready.  Scalable.
 
