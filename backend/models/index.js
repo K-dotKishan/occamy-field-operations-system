@@ -59,7 +59,7 @@ const userSchema = new mongoose.Schema(
         password: { type: String, required: true },
         role: {
             type: String,
-            enum: ["ADMIN", "FIELD", "USER"],
+            enum: ["ADMIN", "FIELD", "USER", "DISTRIBUTOR"],
             default: "FIELD"
         },
         state: String,
@@ -353,6 +353,29 @@ export const AdminMessage = mongoose.model(
             status: { type: String, enum: ["UPDATE", "ALERT", "LOCATION", "MEETING", "SALE"], default: "UPDATE" },
             meetingType: String, // ONE_TO_ONE, GROUP, etc.
             timestamp: { type: Date, default: Date.now }
+        },
+        { timestamps: true }
+    )
+)
+
+/* ================= DISTRIBUTOR INVENTORY ================= */
+export const DistributorInventory = mongoose.model(
+    "DistributorInventory",
+    new mongoose.Schema(
+        {
+            distributorId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+            productName: { type: String, required: true },
+            productSKU: String,
+            packSize: String,
+            // Stock received from company ("mall" / inward)
+            quantityReceived: { type: Number, default: 0 },
+            // Stock distributed / sold outward
+            quantityDistributed: { type: Number, default: 0 },
+            // Current balance = received - distributed
+            currentStock: { type: Number, default: 0 },
+            pricePerUnit: Number,
+            notes: String,
+            lastUpdated: { type: Date, default: Date.now }
         },
         { timestamps: true }
     )
