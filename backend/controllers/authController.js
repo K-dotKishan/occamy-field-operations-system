@@ -42,22 +42,29 @@ export async function signup(req, res) {
 /* ================= LOGIN ================= */
 export async function login(req, res) {
     try {
-        const { email, password } = req.body
+        const { identifier, password } = req.body
 
-        if (!email || !password) {
-            return res.status(400).json({ error: "Email and password are required" })
+        if (!identifier || !password) {
+            return res.status(400).json({ error: "Email/phone and password are required" })
         }
 
-        const cleanEmail = email.trim().toLowerCase()
-        const user = await User.findOne({ email: cleanEmail })
+        const cleanIdentifier = identifier.trim()
+
+        // Always search both fields — user can type either email or phone number
+        const user = await User.findOne({
+            $or: [
+                { email: cleanIdentifier.toLowerCase() },
+                { phone: cleanIdentifier }
+            ]
+        })
 
         if (!user) {
-            return res.status(401).json({ error: "Invalid email or password" })
+            return res.status(401).json({ error: "Invalid email/phone or password" })
         }
 
         const isMatch = await bcrypt.compare(password, user.password)
         if (!isMatch) {
-            return res.status(401).json({ error: "Invalid email or password" })
+            return res.status(401).json({ error: "Invalid email/phone or password" })
         }
 
         const token = jwt.sign(
@@ -69,7 +76,7 @@ export async function login(req, res) {
         res.json({
             token,
             role: user.role,
-            user: { id: user._id, name: user.name, email: user.email }
+            user: { id: user._id, name: user.name, email: user.email, phone: user.phone }
         })
     } catch (err) {
         console.error("Login error details:", err)
