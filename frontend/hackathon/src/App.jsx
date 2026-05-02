@@ -7,6 +7,7 @@ import FieldDashboard from "./pages/FieldDashboard"
 import FieldOfficers from "./pages/FieldOfficers"
 import AdminCharts from "./pages/AdminCharts"
 import Inventory from "./pages/Inventory"
+import DistributorDashboard from "./pages/DistributorDashboard"
 import ProtectedRoute from "./components/ProtectedRoute"
 
 export default function App() {
@@ -66,6 +67,15 @@ export default function App() {
           element={
             <ProtectedRoute>
               <Inventory />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/distributor-dashboard"
+          element={
+            <ProtectedRoute>
+              <DistributorDashboard />
             </ProtectedRoute>
           }
         />
