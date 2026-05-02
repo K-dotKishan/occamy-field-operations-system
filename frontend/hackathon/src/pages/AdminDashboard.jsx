@@ -69,6 +69,7 @@ export default function AdminDashboard() {
         <TabButton active={activeTab === 'analytics'} onClick={() => setActiveTab('analytics')} icon={<TrendingUp size={18} />} label="Analytics" />
         <TabButton active={activeTab === 'map'} onClick={() => setActiveTab('map')} icon={<MapIcon size={18} />} label="Map View" />
         <TabButton active={activeTab === 'messages'} onClick={() => setActiveTab('messages')} icon={<span>💬</span>} label="Messages" />
+        <TabButton active={activeTab === 'distributors'} onClick={() => setActiveTab('distributors')} icon={<Package size={18} />} label="Distributors" />
         <TabButton active={activeTab === 'reports'} onClick={() => setActiveTab('reports')} icon={<Download size={18} />} label="Reports" />
       </div>
 
@@ -85,6 +86,7 @@ export default function AdminDashboard() {
           {activeTab === 'analytics' && <AnalyticsTab data={adminData} colors={COLORS} />}
           {activeTab === 'map' && <MapTab />}
           {activeTab === 'messages' && <MessagesTab />}
+          {activeTab === 'distributors' && <DistributorsTab data={adminData} />}
           {activeTab === 'reports' && <ReportsTab data={adminData} />}
         </>
       )}
@@ -274,6 +276,112 @@ function AnalyticsTab({ data, colors }) {
 
 function MapTab() {
   return <LiveTrackingMap />
+}
+
+function DistributorsTab({ data }) {
+  const distributors = (data.distributors || [])
+  const distSales = (data.distributorSales || []).slice().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+  const distInventory = (data.distributorInventory || []).slice().sort((a, b) => new Date(b.lastUpdated) - new Date(a.lastUpdated))
+  const distAttendance = (data.distributorAttendance || []).slice().sort((a, b) => new Date(b.startTime) - new Date(a.startTime))
+  const ds = data.distributorStats || {}
+
+  return (
+    <>
+      {/* KPI row */}
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <StatCard label="DISTRIBUTORS" value={ds.totalDistributors || 0} icon={<Users size={28} />} color="from-indigo-500 to-indigo-700" />
+        <StatCard label="DIST. SALES" value={ds.totalDistributorSales || 0} icon={<TrendingUp size={28} />} color="from-teal-500 to-teal-700" />
+        <StatCard label="DIST. REVENUE" value={`₹${(ds.totalDistributorRevenue || 0).toLocaleString()}`} icon={<span className="text-2xl">💰</span>} color="from-green-600 to-green-800" />
+        <StatCard label="TOTAL STOCK" value={ds.totalDistributorStock || 0} icon={<Package size={28} />} color="from-amber-500 to-amber-700" />
+      </div>
+
+      {/* Distributor list */}
+      <DataSection title="Distributors" icon={<Users />}>
+        {distributors.length === 0 && <EmptyState />}
+        {distributors.map(d => (
+          <div key={d._id} className="p-4 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="font-bold text-gray-800">{d.name}</p>
+                <p className="text-sm text-gray-600">{d.email} • {d.phone}</p>
+                <p className="text-xs text-gray-400">{d.state}, {d.district}</p>
+              </div>
+              <span className="px-3 py-1 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800">DISTRIBUTOR</span>
+            </div>
+          </div>
+        ))}
+      </DataSection>
+
+      <div className="grid lg:grid-cols-2 gap-8">
+        {/* Distributor Sales — newest first */}
+        <DataSection title="Distributor Sales" icon={<TrendingUp />}>
+          {distSales.length === 0 && <EmptyState />}
+          {distSales.slice(0, 20).map(s => (
+            <div key={s._id} className="p-4 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+              <div className="flex justify-between items-start mb-1">
+                <div className="flex-1">
+                  <p className="font-bold text-gray-800">{s.productName}</p>
+                  <p className="text-sm text-gray-600">{s.userId?.name || "Distributor"} • {s.quantity} × {s.packSize || "unit"}</p>
+                  <p className="text-xs text-gray-400">{s.village}{s.district ? `, ${s.district}` : ""} • {new Date(s.createdAt).toLocaleString()}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-lg font-black text-green-700">₹{(s.totalAmount || 0).toLocaleString()}</p>
+                  <span className={`px-2 py-1 rounded-full text-xs font-bold ${s.saleType === 'B2C' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}`}>{s.saleType}</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </DataSection>
+
+        {/* Distributor Inventory */}
+        <DataSection title="Distributor Inventory" icon={<Package />}>
+          {distInventory.length === 0 && <EmptyState />}
+          {distInventory.slice(0, 20).map(item => (
+            <div key={item._id} className="p-4 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="font-bold text-gray-800">{item.productName}</p>
+                  <p className="text-sm text-gray-600">{item.distributorId?.name || "Distributor"} • {item.packSize || "—"}</p>
+                  <p className="text-xs text-gray-400">Updated: {new Date(item.lastUpdated).toLocaleString()}</p>
+                </div>
+                <div className="text-right space-y-1">
+                  <p className="text-xs text-gray-500">Received: <span className="font-bold text-teal-700">{item.quantityReceived || 0}</span></p>
+                  <p className="text-xs text-gray-500">Distributed: <span className="font-bold text-purple-700">{item.quantityDistributed || 0}</span></p>
+                  <p className="text-xs text-gray-500">In Stock: <span className={`font-bold ${item.currentStock > 0 ? 'text-green-700' : 'text-red-600'}`}>{item.currentStock || 0}</span></p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </DataSection>
+      </div>
+
+      {/* Distributor Attendance — newest first */}
+      <DataSection title="Distributor Attendance" icon={<MapPin />}>
+        {distAttendance.length === 0 && <EmptyState />}
+        {distAttendance.slice(0, 20).map(a => {
+          const isActive = !a.endTime
+          const dMs = a.endTime ? new Date(a.endTime) - new Date(a.startTime) : Date.now() - new Date(a.startTime)
+          const dH = Math.floor(dMs / (1000 * 60 * 60))
+          const dM = Math.floor((dMs % (1000 * 60 * 60)) / (1000 * 60))
+          return (
+            <div key={a._id} className="p-4 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="font-bold text-gray-800">{a.userId?.name || "Distributor"}</p>
+                  <p className="text-sm text-gray-600">{new Date(a.startTime).toLocaleDateString()} • {new Date(a.startTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} {a.endTime ? `→ ${new Date(a.endTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "→ ongoing"}</p>
+                  <p className="text-xs text-gray-400">Duration: {dH}h {dM}m</p>
+                </div>
+                <div className="text-right">
+                  <span className={`px-2 py-1 rounded-full text-xs font-bold ${isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>{isActive ? "Active" : "Done"}</span>
+                  <p className="text-sm font-bold text-orange-600 mt-1">{parseFloat(a.totalDistance || 0).toFixed(2)} km</p>
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </DataSection>
+    </>
+  )
 }
 
 function MessagesTab() {
@@ -680,7 +788,9 @@ function FunnelCard({ label, value, color, percentage }) {
 }
 
 function OfficerPerformanceRow({ officer, data }) {
-  const officerAttendance = (data.attendance || []).filter(a => a.userId?._id === officer._id)
+  const officerAttendance = (data.attendance || [])
+    .filter(a => a.userId?._id === officer._id)
+    .sort((a, b) => new Date(b.startTime) - new Date(a.startTime)) // newest first
   const officerMeetings = (data.meetings || []).filter(m => m.userId?._id === officer._id).length
   const officerSales = (data.sales || []).filter(s => s.userId?._id === officer._id)
   const totalDistance = officerAttendance.reduce((sum, a) => sum + (a.totalDistance || 0), 0)
