@@ -17,6 +17,8 @@ import fieldRoutes from "./routes/field.js"
 console.log("4. Field routes imported")
 import inventoryRoutes from "./routes/inventory.js"
 console.log("5. Inventory routes imported")
+import distributorRoutes from "./routes/distributor.js"
+console.log("6. Distributor routes imported")
 
 const app = express()
 
@@ -47,6 +49,7 @@ app.use("/auth", authRoutes)
 app.use("/admin", adminRoutes)
 app.use("/field", fieldRoutes)
 app.use("/inventory", inventoryRoutes)
+app.use("/distributor", distributorRoutes)
 
 /* ================= ERROR HANDLER ================= */
 app.use((err, req, res, next) => {
