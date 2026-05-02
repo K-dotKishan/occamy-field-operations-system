@@ -2,8 +2,26 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
+/* ===== OCCAMY BIOSCIENCE — CORPORATE CSS VARIABLES ===== */
+:root {
+  /* Brand palette */
+  --color-bg:       #FDF8E1;   /* warm cream page background */
+  --color-navy:     #3E3E5C;   /* primary navy — headings, navbar */
+  --color-teal:     #4A6D7C;   /* secondary teal — accents */
+  --color-green:    #7FB069;   /* brand green — CTAs */
+  --color-card:     #FFFFFF;   /* card / surface */
+  --color-border:   #D8D5C5;   /* subtle border */
+  --color-text:     #3E3E5C;   /* body text */
+  --color-muted:    #7A7490;   /* muted / placeholder */
+  --color-input-bg: #EAF1FF;   /* input background */
 
+  /* Navbar gradient */
+  --navbar-from:    #3E3E5C;
+  --navbar-via:     #4A6D7C;
+  --navbar-to:      #3E3E5C;
+}
+
+@layer base {
   input,
   textarea,
   select {
@@ -15,8 +33,21 @@
   .pb-safe {
     padding-bottom: env(safe-area-inset-bottom);
   }
+
+  /* Occamy brand utility classes */
+  .bg-occamy-bg    { background-color: var(--color-bg); }
+  .bg-occamy-navy  { background-color: var(--color-navy); }
+  .bg-occamy-teal  { background-color: var(--color-teal); }
+  .bg-occamy-green { background-color: var(--color-green); }
+  .text-occamy-navy  { color: var(--color-navy); }
+  .text-occamy-teal  { color: var(--color-teal); }
+  .text-occamy-green { color: var(--color-green); }
+  .text-occamy-muted { color: var(--color-muted); }
+  .border-occamy   { border-color: var(--color-border); }
 }
 
 body {
-  @apply bg-emerald-50 text-gray-800 antialiased overflow-x-hidden;
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  @apply antialiased overflow-x-hidden;
 }
