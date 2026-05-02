@@ -1,6 +1,6 @@
 import {
     Attendance, Activity, Sale, Sample, User,
-    LocationLog, AdminMessage
+    LocationLog, AdminMessage, DistributorInventory
 } from "../models/index.js"
 
 /* ================= MAIN DASHBOARD ================= */
@@ -18,7 +18,9 @@ export async function getDashboard(req, res) {
 
         const [attendance, meetings, users, sales, samples] = await Promise.all([
             Attendance.find({ startTime: { $gte: startDate, $lte: endDate } })
-                .populate("userId", "name role email state district").sort({ startTime: -1 }).limit(50),
+                .populate("userId", "name role email state district")
+                .sort({ startTime: -1 })   // newest first
+                .limit(100),
             Activity.find({ createdAt: { $gte: startDate, $lte: endDate } })
                 .populate("userId", "name role email").sort({ createdAt: -1 }).limit(50).lean(),
             User.find().select("-password"),
@@ -29,6 +31,18 @@ export async function getDashboard(req, res) {
         ])
 
         const adminMessages = await AdminMessage.find().sort({ timestamp: -1 }).limit(100).lean()
+
+        // Distributor data
+        const distributors = users.filter(u => u.role === "DISTRIBUTOR")
+        const distributorIds = distributors.map(d => d._id)
+        const [distributorSales, distributorInventory, distributorAttendance] = await Promise.all([
+            Sale.find({ userId: { $in: distributorIds }, createdAt: { $gte: startDate, $lte: endDate } })
+                .populate("userId", "name role email").sort({ createdAt: -1 }),
+            DistributorInventory.find({ distributorId: { $in: distributorIds } })
+                .populate("distributorId", "name email").sort({ lastUpdated: -1 }),
+            Attendance.find({ userId: { $in: distributorIds }, startTime: { $gte: startDate, $lte: endDate } })
+                .populate("userId", "name role email state district").sort({ startTime: -1 })
+        ])
 
         const messageMap = {}
         adminMessages.forEach(msg => {
@@ -72,10 +86,23 @@ export async function getDashboard(req, res) {
         const farmersConverted = sales.filter(s => s.saleType === 'B2C').length
         const conversionRate = totalFarmersContacted > 0 ? ((farmersConverted / totalFarmersContacted) * 100).toFixed(1) : 0
 
+        const totalDistributorRevenue = distributorSales.reduce((sum, s) => sum + (s.totalAmount || 0), 0)
+        const totalDistributorStock = distributorInventory.reduce((sum, i) => sum + (i.currentStock || 0), 0)
+
         res.json({
             stats: { totalUsers: users.length, totalMeetings: meetings.length, totalSales: sales.length, totalSamples: samples.length, totalRevenue, totalDistance, totalFarmersContacted, farmersConverted, conversionRate },
             attendance, meetings, users, sales, samples,
             adminMessages: adminMessages || [], salesChart, meetingChart, stateData,
+            distributors,
+            distributorSales,
+            distributorInventory,
+            distributorAttendance,
+            distributorStats: {
+                totalDistributors: distributors.length,
+                totalDistributorRevenue,
+                totalDistributorStock,
+                totalDistributorSales: distributorSales.length
+            },
             dateRange: { startDate, endDate }
         })
     } catch (err) {
