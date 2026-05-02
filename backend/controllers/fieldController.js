@@ -46,7 +46,15 @@ export async function getDashboard(req, res) {
         const lastLocation = locationTrack?.path?.[locationTrack.path.length - 1] || null
 
         res.json({
-            activeAttendance: activeAttendance || null,
+            activeAttendance: activeAttendance
+                ? {
+                    _id: activeAttendance._id,
+                    startTime: activeAttendance.startTime,
+                    startLocation: activeAttendance.startLocation,
+                    totalDistance: activeAttendance.totalDistance || 0,
+                    endTime: activeAttendance.endTime || null
+                }
+                : null,
             lastLocation: lastLocation ? { lat: lastLocation.lat, lng: lastLocation.lng, time: lastLocation.time } : null
         })
     } catch (err) {
@@ -102,14 +110,46 @@ export async function endAttendance(req, res) {
         const attendance = await Attendance.findOne({ userId: req.user.id, endTime: null }).sort({ startTime: -1 })
         if (!attendance) return res.status(400).json({ error: "No active day found" })
 
-        const totalDistance = req.body.odometer ? req.body.odometer - attendance.startOdometer : (attendance.totalDistance || 0)
+        // ── Time-gate: require at least 7 hours since Day Start ──────────────
+        const MIN_HOURS = 7
+        const elapsedMs = Date.now() - new Date(attendance.startTime).getTime()
+        const elapsedHours = elapsedMs / (1000 * 60 * 60)
+        if (elapsedHours < MIN_HOURS) {
+            const remaining = Math.ceil((MIN_HOURS * 60) - (elapsedMs / (1000 * 60)))
+            return res.status(400).json({
+                error: `Day End is locked. You must work at least ${MIN_HOURS} hours. ${remaining} minute(s) remaining.`,
+                code: "TIME_GATE",
+                remainingMinutes: remaining
+            })
+        }
+
+        // ── Distance validation: pull the latest persisted distance ──────────
+        // Prefer GPS-accumulated totalDistance; fall back to odometer diff if provided
+        const gpsDistance = attendance.totalDistance || 0
+        const odometerDistance = req.body.odometer ? req.body.odometer - (attendance.startOdometer || 0) : null
+        // Use odometer only when GPS distance is 0 (officer didn't track) and odometer was supplied
+        const finalDistance = gpsDistance > 0 ? gpsDistance : (odometerDistance !== null && odometerDistance >= 0 ? odometerDistance : 0)
+
         attendance.endTime = new Date()
-        attendance.endLocation = { lat: req.body.location.lat, lng: req.body.location.lng, address: req.body.location.address || "" }
+        attendance.endLocation = {
+            lat: req.body.location?.lat || 0,
+            lng: req.body.location?.lng || 0,
+            address: req.body.location?.address || ""
+        }
         attendance.endOdometer = req.body.odometer || 0
-        attendance.totalDistance = totalDistance
+        attendance.totalDistance = parseFloat(finalDistance.toFixed(3))
         await attendance.save()
 
-        res.json({ message: "Day ended successfully", attendance })
+        res.json({
+            message: "Day ended successfully",
+            attendance,
+            summary: {
+                totalDistance: attendance.totalDistance,
+                startTime: attendance.startTime,
+                endTime: attendance.endTime,
+                durationHours: parseFloat(elapsedHours.toFixed(2))
+            }
+        })
     } catch (err) {
         console.error("End day error:", err)
         res.status(500).json({ error: "Failed to end day" })
