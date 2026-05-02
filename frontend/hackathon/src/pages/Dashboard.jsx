@@ -1,4 +1,5 @@
 import { socket } from "../socket"
+import occamyLogo from "../assets/occamylogo.jpg"
 import { MapContainer, TileLayer, Marker, Polyline, Popup, Circle } from "react-leaflet"
 import "leaflet/dist/leaflet.css"
 import L from "leaflet"
@@ -84,6 +85,8 @@ export default function Dashboard() {
   // Field attendance states
   const [activeAttendance, setActiveAttendance] = useState(null)
   const [isEndingDay, setIsEndingDay] = useState(false)
+  const [canEndDay, setCanEndDay] = useState(false)          // time-gate flag
+  const [endDayCountdown, setEndDayCountdown] = useState("") // human-readable remaining time
   const menuRef = useRef(null) // Ref for mobile menu click outside detection
 
   /* ================= AUTH + DATA LOAD ================= */
@@ -101,6 +104,11 @@ export default function Dashboard() {
       loadProducts()
       loadOrders()
     } else if (role === "FIELD") {
+      // Immediately restore from localStorage to avoid flash of "no session"
+      const cached = localStorage.getItem("activeAttendance")
+      if (cached) {
+        try { setActiveAttendance(JSON.parse(cached)) } catch (_) {}
+      }
       loadFieldData()
     }
 
@@ -178,6 +186,37 @@ export default function Dashboard() {
 
     return () => navigator.geolocation.clearWatch(watchId)
   }, [role])
+
+  /* ================= TIME-GATE: ENABLE END DAY AFTER 7 HOURS ================= */
+  useEffect(() => {
+    if (!activeAttendance?.startTime) {
+      setCanEndDay(false)
+      setEndDayCountdown("")
+      return
+    }
+
+    const MIN_MS = 7 * 60 * 60 * 1000 // 7 hours in ms
+
+    const tick = () => {
+      const elapsed = Date.now() - new Date(activeAttendance.startTime).getTime()
+      const remaining = MIN_MS - elapsed
+
+      if (remaining <= 0) {
+        setCanEndDay(true)
+        setEndDayCountdown("")
+      } else {
+        setCanEndDay(false)
+        const h = Math.floor(remaining / (1000 * 60 * 60))
+        const m = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60))
+        const s = Math.floor((remaining % (1000 * 60)) / 1000)
+        setEndDayCountdown(`${h}h ${m}m ${s}s`)
+      }
+    }
+
+    tick() // run immediately
+    const interval = setInterval(tick, 1000)
+    return () => clearInterval(interval)
+  }, [activeAttendance?.startTime])
 
   /* ================= SOCKET CONNECTIONS ================= */
   useEffect(() => {
@@ -274,6 +313,8 @@ export default function Dashboard() {
       // Check if there's an active attendance session
       if (data.activeAttendance) {
         setActiveAttendance(data.activeAttendance)
+        // Persist to localStorage so a hard reload doesn't flash "no session"
+        localStorage.setItem("activeAttendance", JSON.stringify(data.activeAttendance))
 
         // Auto-resume tracking if attendance is active (no endTime)
         if (!data.activeAttendance.endTime) {
@@ -281,6 +322,10 @@ export default function Dashboard() {
           // Using setTimeout to ensure startLiveTracking is available and state updates have processed
           setTimeout(() => startLiveTracking(false), 500)
         }
+      } else {
+        // No active session on server — clear any stale localStorage entry
+        localStorage.removeItem("activeAttendance")
+        setActiveAttendance(null)
       }
 
       // Fetch Stats Summary
@@ -288,6 +333,11 @@ export default function Dashboard() {
       setFieldStats(summary.today)
     } catch (error) {
       console.error("Failed to load field data:", error)
+      // On network error, restore from localStorage so the UI doesn't reset
+      const cached = localStorage.getItem("activeAttendance")
+      if (cached) {
+        try { setActiveAttendance(JSON.parse(cached)) } catch (_) {}
+      }
     }
   }
 
@@ -479,7 +529,7 @@ export default function Dashboard() {
       setLocation(coords)
 
       // Start attendance
-      await api("/field/attendance/start", "POST", {
+      const attendanceRecord = await api("/field/attendance/start", "POST", {
         location: coords,
         timestamp: new Date().toISOString()
       })
@@ -487,12 +537,12 @@ export default function Dashboard() {
       // Start live tracking automatically
       startLiveTracking(false)
 
-      // Success animation
-      // setTimeout(() => setPulseAnimation(false), 1000)
-
       // Show success message
       showNotification("success", "Attendance started successfully! Live tracking active.")
-      setActiveAttendance({ startTime: new Date() }) // Track active attendance
+      const newAttendance = { ...attendanceRecord, startTime: attendanceRecord.startTime || new Date().toISOString() }
+      setActiveAttendance(newAttendance)
+      // Persist so page reload doesn't lose the session
+      localStorage.setItem("activeAttendance", JSON.stringify(newAttendance))
 
     } catch (error) {
       console.error("Error starting day:", error)
@@ -506,6 +556,19 @@ export default function Dashboard() {
   const endDay = async () => {
     if (!navigator.geolocation) {
       showNotification("error", "Geolocation not supported")
+      return
+    }
+
+    // Client-side time-gate guard (mirrors backend)
+    if (!canEndDay) {
+      showNotification("warning", `Day End locked. ${endDayCountdown} remaining before you can end the day.`)
+      return
+    }
+
+    // Distance verification: warn if no distance was recorded
+    const currentDistance = fieldStats?.distanceTraveled || 0
+    if (currentDistance === 0 && isTracking) {
+      showNotification("warning", "No distance recorded yet. GPS tracking is active — please wait a moment and try again.")
       return
     }
 
@@ -525,8 +588,8 @@ export default function Dashboard() {
         lng: position.coords.longitude
       }
 
-      // End attendance
-      await api("/field/attendance/end", "POST", {
+      // End attendance — backend will validate time-gate and capture final distance
+      const result = await api("/field/attendance/end", "POST", {
         location: coords,
         timestamp: new Date().toISOString()
       })
@@ -534,17 +597,24 @@ export default function Dashboard() {
       // Stop live tracking
       stopLiveTracking()
 
-      // Clear active attendance state
+      // Clear active attendance state and localStorage
       setActiveAttendance(null)
+      localStorage.removeItem("activeAttendance")
 
-      // Show success message
-      showNotification("success", "Day ended successfully! See you tomorrow.")
+      const dist = result?.summary?.totalDistance ?? currentDistance
+      const hrs = result?.summary?.durationHours ?? ""
+      showNotification("success", `Day ended! Distance: ${parseFloat(dist).toFixed(2)} km${hrs ? ` | Duration: ${hrs}h` : ""}. See you tomorrow.`)
       setIsEndingDay(false)
 
     } catch (error) {
       console.error("Error ending day:", error)
       const errorMsg = error?.error || error?.message || "Unknown error"
-      showNotification("error", "Failed to end day: " + errorMsg)
+      // Surface time-gate errors clearly
+      if (error?.code === "TIME_GATE" || errorMsg.includes("locked") || errorMsg.includes("hours")) {
+        showNotification("warning", errorMsg)
+      } else {
+        showNotification("error", "Failed to end day: " + errorMsg)
+      }
       setIsEndingDay(false)
     }
   }
@@ -685,7 +755,7 @@ export default function Dashboard() {
   const mapStats = calculateMapStats()
 
   return (
-    <div className={`min-h-screen bg-gradient-to-br from-slate-50 via-green-50 to-emerald-50 overflow-x-hidden ${isMapFullscreen ? 'fixed inset-0 z-50 bg-white' : ''}`}>
+    <div className={`min-h-screen bg-[#FDF8E1] overflow-x-hidden ${isMapFullscreen ? 'fixed inset-0 z-50 bg-white' : ''}`}>
       {/* Click Outside Handler for Mobile Menu */}
       {isMenuOpen && (
         <div
@@ -704,7 +774,7 @@ export default function Dashboard() {
 
       {/* ================= ENHANCED NAVBAR ================= */}
       {!isMapFullscreen && (
-        <nav className={`bg-gradient-to-r from-emerald-700 via-green-700 to-teal-700 text-white transition-all duration-300 fixed top-0 left-0 right-0 z-[2000] ${isScrolled ? 'shadow-lg py-3' : 'py-4'
+        <nav className={`bg-gradient-to-r from-[#3E3E5C] via-[#4A6D7C] to-[#3E3E5C] text-white transition-all duration-300 fixed top-0 left-0 right-0 z-[2000] ${isScrolled ? 'shadow-lg py-3' : 'py-4'
           }`}>
           <div className="max-w-7xl mx-auto px-4 sm:px-6">
             <div className="flex justify-between items-center">
@@ -716,12 +786,16 @@ export default function Dashboard() {
               </button>
 
               <div className="flex items-center gap-2 sm:gap-3">
-                <div className="w-9 h-9 sm:w-12 sm:h-12 bg-white/10 sm:bg-white rounded-lg sm:rounded-xl flex items-center justify-center backdrop-blur-sm sm:shadow-md border border-white/20 sm:border-transparent">
-                  <span className="text-lg sm:text-2xl">🌱</span>
+                <div className="w-9 h-9 sm:w-12 sm:h-12 bg-white rounded-lg sm:rounded-xl flex items-center justify-center shadow-md overflow-hidden border border-white/20">
+                  <img
+                    src={occamyLogo}
+                    alt="Occamy Bioscience"
+                    className="w-full h-full object-contain"
+                  />
                 </div>
                 <div className="flex flex-col">
                   <h1 className="text-sm sm:text-2xl font-black tracking-tight leading-none text-white">OCCAMY BIOSCIENCE</h1>
-                  <p className="text-[10px] sm:text-xs text-green-100 sm:text-green-200 font-medium tracking-wide opacity-90">Sustainable Agriculture</p>
+                  <p className="text-[10px] sm:text-xs text-[#D8D5C5] font-medium tracking-wide opacity-90">Sustainable Agriculture</p>
                 </div>
               </div>
 
@@ -730,7 +804,7 @@ export default function Dashboard() {
                 <div className="hidden lg:flex items-center gap-4 animate-fadeIn">
                   {role === "FIELD" && (
                     <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold ${isTracking
-                      ? 'bg-gradient-to-r from-green-500 to-emerald-600 animate-pulse'
+                      ? 'bg-gradient-to-r from-[#7FB069] to-[#4A6D7C] animate-pulse'
                       : 'bg-gradient-to-r from-gray-500 to-gray-600'
                       }`}>
                       <div className={`w-2 h-2 rounded-full ${isTracking ? 'bg-white animate-ping' : 'bg-gray-300'}`}></div>
@@ -781,7 +855,7 @@ export default function Dashboard() {
 
           {/* Mobile Menu */}
           {isMenuOpen && (
-            <div ref={menuRef} className="lg:hidden bg-gradient-to-b from-emerald-800 to-teal-900 mt-2 mx-4 px-4 py-4 rounded-2xl shadow-xl animate-slideInDown z-50 fixed left-0 right-0 top-16">
+            <div ref={menuRef} className="lg:hidden bg-gradient-to-b from-[#3E3E5C] to-[#4A6D7C] mt-2 mx-4 px-4 py-4 rounded-2xl shadow-xl animate-slideInDown z-50 fixed left-0 right-0 top-16">
               <div className="flex flex-col gap-2">
                 {/* Dynamic Menu Items based on Role */}
                 {role === "ADMIN" && (
@@ -1542,9 +1616,13 @@ export default function Dashboard() {
                       </EnhancedDataSection>
 
                       <EnhancedDataSection title="Recent Attendance" icon={<MapPin size={16} />} count={(adminData?.attendance || []).length}>
-                        {(adminData?.attendance || []).slice(0, 5).map((a, index) => (
-                          <EnhancedAttendanceRow key={a._id} attendance={a} delay={index * 100} />
-                        ))}
+                        {(adminData?.attendance || [])
+                          .slice()
+                          .sort((a, b) => new Date(b.startTime) - new Date(a.startTime))
+                          .slice(0, 10)
+                          .map((a, index) => (
+                            <EnhancedAttendanceRow key={a._id} attendance={a} delay={index * 100} />
+                          ))}
                       </EnhancedDataSection>
                     </div>
                   </>
@@ -1637,10 +1715,10 @@ export default function Dashboard() {
                 <ActionButton
                   icon={<MapPin size={20} />}
                   label="End Day"
-                  subtitle="Close attendance"
-                  color="from-red-500 to-rose-600"
+                  subtitle={canEndDay ? "Close attendance" : (endDayCountdown ? `Locked: ${endDayCountdown}` : "Close attendance")}
+                  color={canEndDay ? "from-red-500 to-rose-600" : "from-gray-400 to-gray-500"}
                   onClick={endDay}
-                  disabled={isEndingDay}
+                  disabled={isEndingDay || !canEndDay}
                   delay={0}
                 />
               )}
@@ -2616,17 +2694,29 @@ function EnhancedMeetingRow({ meeting, delay = 0 }) {
 
 /* ================= ENHANCED ATTENDANCE ROW ================= */
 function EnhancedAttendanceRow({ attendance, delay = 0 }) {
+  const isActive = !attendance.endTime
+  const durationMs = attendance.endTime
+    ? new Date(attendance.endTime) - new Date(attendance.startTime)
+    : Date.now() - new Date(attendance.startTime)
+  const durationH = Math.floor(durationMs / (1000 * 60 * 60))
+  const durationM = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60))
+
   return (
     <div
       style={{ animationDelay: `${delay}ms` }}
       className="animate-fadeIn"
     >
       <div className="p-3 sm:p-4 border-b border-gray-100 hover:bg-gray-50 transition-all duration-300 group">
-        <p className="font-bold text-gray-800 text-sm truncate group-hover:text-blue-700">
-          {attendance.userId?.name || "Field Officer"}
-        </p>
-        <p className="text-xs text-gray-600 truncate">{attendance.userId?.email}</p>
-        <div className="flex flex-wrap gap-2 mt-2 text-xs text-gray-500">
+        <div className="flex items-center justify-between mb-1">
+          <p className="font-bold text-gray-800 text-sm truncate group-hover:text-blue-700">
+            {attendance.userId?.name || "Field Officer"}
+          </p>
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+            {isActive ? '🟢 Active' : '✅ Completed'}
+          </span>
+        </div>
+        <p className="text-xs text-gray-500 truncate mb-2">{attendance.userId?.email}</p>
+        <div className="flex flex-wrap gap-2 text-xs text-gray-500">
           <span className="flex items-center gap-1">
             <Calendar size={10} />
             {new Date(attendance.startTime).toLocaleDateString()}
@@ -2634,15 +2724,25 @@ function EnhancedAttendanceRow({ attendance, delay = 0 }) {
           <span className="flex items-center gap-1">
             🕐 {new Date(attendance.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </span>
-          {attendance.endTime && (
+          {attendance.endTime ? (
             <span className="flex items-center gap-1">
               → {new Date(attendance.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </span>
+          ) : (
+            <span className="text-green-600 font-semibold">→ ongoing</span>
           )}
-          {attendance.location && (
-            <span className="flex items-center gap-1">
+          <span className="flex items-center gap-1 font-semibold text-blue-600">
+            ⏱ {durationH}h {durationM}m
+          </span>
+        </div>
+        <div className="flex flex-wrap gap-2 mt-1 text-xs">
+          <span className="flex items-center gap-1 text-orange-600 font-semibold">
+            📏 {parseFloat(attendance.totalDistance || 0).toFixed(2)} km
+          </span>
+          {attendance.startLocation?.lat && (
+            <span className="flex items-center gap-1 text-gray-400">
               <MapPin size={10} />
-              {attendance.location.lat?.toFixed(2)}, {attendance.location.lng?.toFixed(2)}
+              {attendance.startLocation.lat.toFixed(3)}, {attendance.startLocation.lng.toFixed(3)}
             </span>
           )}
         </div>
