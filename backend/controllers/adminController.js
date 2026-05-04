@@ -412,3 +412,134 @@ export async function getFieldOfficers(req, res) {
         res.status(500).json({ error: "Failed to fetch field officers" })
     }
 }
+
+/* ================= DISTRIBUTOR MANAGEMENT ================= */
+export async function getDistributors(req, res) {
+    try {
+        if (req.user.role !== "ADMIN") return res.status(403).json({ error: "Forbidden" })
+
+        const distributors = await User.find({ role: "DISTRIBUTOR" }).select("-password").lean()
+        const distributorIds = distributors.map(d => d._id)
+
+        const today = new Date(); today.setHours(0, 0, 0, 0)
+
+        // Run all queries in parallel for performance
+        const [
+            activeAttendances,
+            todaySalesAgg,
+            inventoryAgg,
+            lastLocations
+        ] = await Promise.all([
+            // Active (open) attendance sessions — gives live distance + GPS status
+            Attendance.find({ userId: { $in: distributorIds }, endTime: null })
+                .select("userId totalDistance startTime startLocation")
+                .lean(),
+
+            // Today's sales aggregated per distributor
+            Sale.aggregate([
+                { $match: { userId: { $in: distributorIds }, createdAt: { $gte: today } } },
+                {
+                    $group: {
+                        _id: "$userId",
+                        todayRevenue: { $sum: "$totalAmount" },
+                        todaySalesCount: { $sum: 1 }
+                    }
+                }
+            ]),
+
+            // Current stock per distributor (sum of currentStock across all products)
+            DistributorInventory.aggregate([
+                { $match: { distributorId: { $in: distributorIds } } },
+                {
+                    $group: {
+                        _id: "$distributorId",
+                        totalStock: { $sum: "$currentStock" },
+                        productCount: { $sum: 1 }
+                    }
+                }
+            ]),
+
+            // Most recent GPS point per distributor
+            LocationLog.aggregate([
+                { $match: { userId: { $in: distributorIds } } },
+                { $sort: { timestamp: -1 } },
+                {
+                    $group: {
+                        _id: "$userId",
+                        location: { $first: "$location" },
+                        timestamp: { $first: "$timestamp" },
+                        accuracy: { $first: "$accuracy" }
+                    }
+                }
+            ])
+        ])
+
+        // Build lookup maps for O(1) access
+        const activeAttMap  = new Map(activeAttendances.map(a => [a.userId.toString(), a]))
+        const salesMap      = new Map(todaySalesAgg.map(s => [s._id.toString(), s]))
+        const inventoryMap  = new Map(inventoryAgg.map(i => [i._id.toString(), i]))
+        const locationMap   = new Map(lastLocations.map(l => [l._id.toString(), l]))
+
+        const result = distributors.map(d => {
+            const id        = d._id.toString()
+            const att       = activeAttMap.get(id)
+            const sales     = salesMap.get(id)
+            const inv       = inventoryMap.get(id)
+            const loc       = locationMap.get(id)
+
+            return {
+                _id:          d._id,
+                name:         d.name,
+                email:        d.email,
+                phone:        d.phone,
+                state:        d.state,
+                district:     d.district,
+                // GPS / attendance
+                isActive:     !!att,                                          // Day started and not ended
+                startTime:    att?.startTime || null,
+                // High-precision distance from the $inc-accumulated field
+                totalDistance: parseFloat((att?.totalDistance || 0).toFixed(6)),
+                lastLocation: loc?.location || null,
+                lastLocationTime: loc?.timestamp || null,
+                locationAccuracy: loc?.accuracy || null,
+                // Today's commercial activity
+                todayRevenue:     sales?.todayRevenue     || 0,
+                todaySalesCount:  sales?.todaySalesCount  || 0,
+                // Inventory
+                totalStock:   inv?.totalStock   || 0,
+                productCount: inv?.productCount || 0
+            }
+        })
+
+        // Summary stats for the stat row
+        const summary = {
+            totalDistributors:  result.length,
+            activeDistributors: result.filter(d => d.isActive).length,
+            totalFleetDistance: parseFloat(result.reduce((s, d) => s + d.totalDistance, 0).toFixed(6)),
+            totalTodayRevenue:  result.reduce((s, d) => s + d.todayRevenue, 0),
+            totalStock:         result.reduce((s, d) => s + d.totalStock, 0)
+        }
+
+        res.json({ distributors: result, summary })
+    } catch (err) {
+        console.error("Get distributors error:", err)
+        res.status(500).json({ error: "Failed to fetch distributor data" })
+    }
+}
+
+/* ================= DISTRIBUTOR SALE HISTORY ================= */
+export async function getDistributorSales(req, res) {
+    try {
+        if (req.user.role !== "ADMIN") return res.status(403).json({ error: "Forbidden" })
+
+        const sales = await Sale.find({ userId: req.params.distributorId })
+            .sort({ createdAt: -1 })
+            .limit(100)
+            .lean()
+
+        res.json(sales)
+    } catch (err) {
+        console.error("Get distributor sales error:", err)
+        res.status(500).json({ error: "Failed to fetch distributor sales" })
+    }
+}
