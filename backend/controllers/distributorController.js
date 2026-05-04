@@ -172,29 +172,54 @@ export async function trackLocation(req, res) {
 
         const locationLog = await LocationLog.create({
             userId: req.user.id,
-            attendanceId: attendance?._id,
+            attendanceId: attendance?._id || null,
             location: { lat, lng, address: address || "" },
             accuracy: accuracy || 0,
             activity: activity || "TRAVEL"
         })
 
+        // ── Distance accumulation (additive, never overwrites) ────────────
+        // Query by userId only (not attendanceId) so we always find the
+        // previous point even at the start of a new session
         if (attendance) {
             const lastLog = await LocationLog.findOne({
                 userId: req.user.id,
-                attendanceId: attendance._id,
                 _id: { $ne: locationLog._id }
             }).sort({ timestamp: -1 })
 
-            if (lastLog?.location?.lat) {
-                const dist = calculateDistance(lastLog.location.lat, lastLog.location.lng, lat, lng)
-                if (dist > 0.002 && dist < 100) {
-                    attendance.totalDistance = (attendance.totalDistance || 0) + dist
-                    await attendance.save()
+            if (lastLog?.location?.lat && lastLog?.location?.lng) {
+                const distKm = calculateDistance(
+                    lastLog.location.lat, lastLog.location.lng,
+                    lat, lng
+                )
+                // Threshold: 0.5 m (0.0005 km) minimum, 5 km maximum per update
+                if (distKm > 0.0005 && distKm < 5) {
+                    // 6 decimal places = 0.001 m precision before $inc
+                    const increment = parseFloat(distKm.toFixed(6))
+
+                    // Atomic $inc with { new: true } — returns updated doc immediately
+                    const updated = await Attendance.findByIdAndUpdate(
+                        attendance._id,
+                        { $inc: { totalDistance: increment } },
+                        { new: true }
+                    ).select("totalDistance")
+
+                    // Update LocationTrack path
+                    const today = new Date(); today.setHours(0, 0, 0, 0)
+                    let track = await LocationTrack.findOne({ userId: req.user.id, date: today })
+                    if (!track) track = await LocationTrack.create({ userId: req.user.id, date: today, path: [] })
+                    track.path.push({ lat, lng, time: new Date() })
+                    await track.save()
+
+                    return res.json({
+                        success: true,
+                        totalDistance: parseFloat((updated?.totalDistance || 0).toFixed(6))
+                    })
                 }
             }
         }
 
-        // Also update LocationTrack daily path
+        // Update LocationTrack path regardless of distance threshold
         const today = new Date(); today.setHours(0, 0, 0, 0)
         let track = await LocationTrack.findOne({ userId: req.user.id, date: today })
         if (!track) track = await LocationTrack.create({ userId: req.user.id, date: today, path: [] })
@@ -203,7 +228,7 @@ export async function trackLocation(req, res) {
 
         res.json({
             success: true,
-            totalDistance: attendance?.totalDistance || 0
+            totalDistance: parseFloat((attendance?.totalDistance || 0).toFixed(6))
         })
     } catch (err) {
         console.error("Distributor track location error:", err)

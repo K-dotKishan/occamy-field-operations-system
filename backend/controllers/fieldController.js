@@ -362,24 +362,62 @@ export async function trackLocation(req, res) {
         const { lat, lng, accuracy, address, activity } = req.body
         if (!lat || !lng) return res.status(400).json({ error: "Latitude and longitude required" })
 
+        // Find active attendance session (if any)
         const attendance = await Attendance.findOne({ userId: req.user.id, endTime: null })
+
+        // Create the new location log entry
         const locationLog = await LocationLog.create({
-            userId: req.user.id, attendanceId: attendance?._id,
-            location: { lat, lng, address: address || "" }, accuracy: accuracy || 0, activity: activity || "TRAVEL"
+            userId: req.user.id,
+            attendanceId: attendance?._id || null,
+            location: { lat, lng, address: address || "" },
+            accuracy: accuracy || 0,
+            activity: activity || "TRAVEL"
         })
 
+        // ── Distance accumulation ──────────────────────────────────────────
+        // Query by userId only so we always find the previous point even at
+        // the very start of a new attendance session.
         if (attendance) {
-            const lastLog = await LocationLog.findOne({ userId: req.user.id, attendanceId: attendance._id, _id: { $ne: locationLog._id } }).sort({ timestamp: -1 })
-            if (lastLog?.location?.lat) {
-                const dist = calculateDistance(lastLog.location.lat, lastLog.location.lng, lat, lng)
-                if (dist > 0.002 && dist < 100) {
-                    attendance.totalDistance = (attendance.totalDistance || 0) + dist
-                    await attendance.save()
+            const lastLog = await LocationLog.findOne({
+                userId: req.user.id,
+                _id: { $ne: locationLog._id }
+            }).sort({ timestamp: -1 })
+
+            if (lastLog?.location?.lat && lastLog?.location?.lng) {
+                // calculateDistance now uses the Haversine formula in metres
+                // internally, so sub-metre precision is preserved.
+                const distKm = calculateDistance(
+                    lastLog.location.lat, lastLog.location.lng,
+                    lat, lng
+                )
+
+                // Threshold: 0.5 m (0.0005 km) minimum, 5 km maximum per update
+                if (distKm > 0.0005 && distKm < 5) {
+                    // 6 decimal places = 0.001 m precision before $inc
+                    const increment = parseFloat(distKm.toFixed(6))
+
+                    // Atomic $inc — never overwrites, safe under concurrent updates
+                    const updated = await Attendance.findByIdAndUpdate(
+                        attendance._id,
+                        { $inc: { totalDistance: increment } },
+                        { new: true }          // return the document AFTER update
+                    ).select("totalDistance")
+
+                    return res.json({
+                        success: true,
+                        locationId: locationLog._id,
+                        totalDistance: parseFloat((updated?.totalDistance || 0).toFixed(6))
+                    })
                 }
             }
         }
 
-        res.json({ success: true, message: "Location tracked", locationId: locationLog._id, totalDistance: attendance?.totalDistance || 0 })
+        // No active attendance or movement below threshold — return current total
+        res.json({
+            success: true,
+            locationId: locationLog._id,
+            totalDistance: parseFloat((attendance?.totalDistance || 0).toFixed(6))
+        })
     } catch (err) {
         console.error("Location tracking error:", err)
         res.status(500).json({ error: "Failed to track location" })

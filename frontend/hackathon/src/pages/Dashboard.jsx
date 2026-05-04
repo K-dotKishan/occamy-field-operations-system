@@ -173,16 +173,29 @@ export default function Dashboard() {
     if (role !== "FIELD") return
     if (!navigator.geolocation) return
 
-    const watchId = navigator.geolocation.watchPosition(async (pos) => {
-      try {
-        await api("/field/location", "POST", {
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude
-        })
-      } catch (err) {
-        console.log("GPS send failed")
+    // This watcher is intentionally separate from startLiveTracking — it keeps
+    // the LocationTrack path updated even when the main tracking watcher isn't running.
+    // Use high accuracy + no caching so every real movement is captured.
+    const watchId = navigator.geolocation.watchPosition(
+      async (pos) => {
+        try {
+          await api("/field/location/track", "POST", {
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+            accuracy: pos.coords.accuracy,
+            activity: "TRAVEL"
+          })
+        } catch (err) {
+          console.log("GPS send failed")
+        }
+      },
+      (err) => console.log("GPS background error:", err.message),
+      {
+        enableHighAccuracy: true,
+        maximumAge: 0,        // never use a cached position
+        timeout: 30000
       }
-    })
+    )
 
     return () => navigator.geolocation.clearWatch(watchId)
   }, [role])
