@@ -1181,6 +1181,20 @@ export default function Dashboard() {
                           delay={400}
                         />
                       </div>
+
+                      {/* DISTRIBUTORS — 5th card, navigates to dedicated page */}
+                      <div
+                        onClick={() => navigate('/admin/distributors')}
+                        className="cursor-pointer transition-transform hover:scale-105"
+                      >
+                        <StatCard
+                          label="DISTRIBUTORS"
+                          value={adminData?.users?.filter(u => u.role === 'DISTRIBUTOR').length || 0}
+                          icon={<Users size={20} />}
+                          color="from-indigo-500 to-purple-600"
+                          delay={500}
+                        />
+                      </div>
                     </div>
 
                     {/* Quick Actions Grid - MOVED UP since metrics removed */}

@@ -279,107 +279,316 @@ function MapTab() {
 }
 
 function DistributorsTab({ data }) {
-  const distributors = (data.distributors || [])
-  const distSales = (data.distributorSales || []).slice().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-  const distInventory = (data.distributorInventory || []).slice().sort((a, b) => new Date(b.lastUpdated) - new Date(a.lastUpdated))
-  const distAttendance = (data.distributorAttendance || []).slice().sort((a, b) => new Date(b.startTime) - new Date(a.startTime))
-  const ds = data.distributorStats || {}
+  const [distData, setDistData] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState("")
+  const [selectedDist, setSelectedDist] = useState(null)   // for detail modal
+  const [distSales, setDistSales] = useState([])
+  const [salesLoading, setSalesLoading] = useState(false)
+  const [autoRefresh, setAutoRefresh] = useState(true)
+
+  const loadDistributors = async () => {
+    try {
+      const d = await api("/admin/distributors")
+      setDistData(d)
+    } catch (err) {
+      console.error("Failed to load distributors:", err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadDistributors()
+  }, [])
+
+  // Auto-refresh every 10 s so distance updates live
+  useEffect(() => {
+    if (!autoRefresh) return
+    const iv = setInterval(loadDistributors, 10000)
+    return () => clearInterval(iv)
+  }, [autoRefresh])
+
+  const openDetail = async (dist) => {
+    setSelectedDist(dist)
+    setSalesLoading(true)
+    try {
+      const s = await api(`/admin/distributors/${dist._id}/sales`)
+      setDistSales(s || [])
+    } catch (_) { setDistSales([]) }
+    finally { setSalesLoading(false) }
+  }
+
+  const filtered = (distData?.distributors || []).filter(d =>
+    d.name.toLowerCase().includes(search.toLowerCase()) ||
+    (d.phone || "").includes(search) ||
+    (d.email || "").toLowerCase().includes(search.toLowerCase())
+  )
+
+  const s = distData?.summary || {}
+
+  if (loading) return (
+    <div className="text-center py-20">
+      <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-indigo-600 border-t-transparent"></div>
+      <p className="text-gray-500 mt-3 text-sm">Loading distributor data…</p>
+    </div>
+  )
 
   return (
     <>
-      {/* KPI row */}
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard label="DISTRIBUTORS" value={ds.totalDistributors || 0} icon={<Users size={28} />} color="from-indigo-500 to-indigo-700" />
-        <StatCard label="DIST. SALES" value={ds.totalDistributorSales || 0} icon={<TrendingUp size={28} />} color="from-teal-500 to-teal-700" />
-        <StatCard label="DIST. REVENUE" value={`₹${(ds.totalDistributorRevenue || 0).toLocaleString()}`} icon={<span className="text-2xl">💰</span>} color="from-green-600 to-green-800" />
-        <StatCard label="TOTAL STOCK" value={ds.totalDistributorStock || 0} icon={<Package size={28} />} color="from-amber-500 to-amber-700" />
+      {/* ── STAT ROW ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+        {[
+          { label: "TOTAL DISTRIBUTORS", value: s.totalDistributors ?? 0,       color: "from-indigo-500 to-indigo-700",  icon: <Users size={22} /> },
+          { label: "ACTIVE TODAY",        value: s.activeDistributors ?? 0,      color: "from-green-500 to-emerald-700",  icon: <span className="text-lg">🟢</span> },
+          { label: "FLEET DISTANCE",      value: `${parseFloat(s.totalFleetDistance || 0).toFixed(2)} km`, color: "from-orange-500 to-amber-600", icon: <MapPin size={22} /> },
+          { label: "TODAY'S REVENUE",     value: `₹${(s.totalTodayRevenue || 0).toLocaleString()}`, color: "from-teal-500 to-teal-700", icon: <TrendingUp size={22} /> },
+          { label: "TOTAL STOCK",         value: s.totalStock ?? 0,              color: "from-purple-500 to-purple-700",  icon: <Package size={22} /> },
+        ].map(k => (
+          <div key={k.label} className={`bg-gradient-to-br ${k.color} text-white p-4 rounded-2xl shadow-lg`}>
+            <div className="flex justify-between items-start mb-2">
+              <p className="text-xs font-bold opacity-80 tracking-wider leading-tight">{k.label}</p>
+              <div className="bg-white bg-opacity-20 p-1.5 rounded-lg">{k.icon}</div>
+            </div>
+            <p className="text-2xl font-black">{k.value}</p>
+          </div>
+        ))}
       </div>
 
-      {/* Distributor list */}
-      <DataSection title="Distributors" icon={<Users />}>
-        {distributors.length === 0 && <EmptyState />}
-        {distributors.map(d => (
-          <div key={d._id} className="p-4 border-b border-gray-100 hover:bg-gray-50 transition-colors">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="font-bold text-gray-800">{d.name}</p>
-                <p className="text-sm text-gray-600">{d.email} • {d.phone}</p>
-                <p className="text-xs text-gray-400">{d.state}, {d.district}</p>
+      {/* ── SEARCH + REFRESH ── */}
+      <div className="flex flex-col sm:flex-row gap-3 mb-4">
+        <div className="relative flex-1">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
+          <input
+            type="text"
+            placeholder="Search by name, phone or email…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="w-full pl-9 pr-4 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:border-indigo-400 outline-none transition-colors"
+          />
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={loadDistributors}
+            className="px-4 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 transition-colors flex items-center gap-2"
+          >
+            🔄 Refresh
+          </button>
+          <button
+            onClick={() => setAutoRefresh(p => !p)}
+            className={`px-4 py-2.5 rounded-xl text-sm font-bold transition-colors flex items-center gap-2 ${autoRefresh ? 'bg-green-100 text-green-700 border-2 border-green-300' : 'bg-gray-100 text-gray-600 border-2 border-gray-200'}`}
+          >
+            {autoRefresh ? '⏸ Live' : '▶ Live'}
+          </button>
+        </div>
+      </div>
+
+      {/* ── DATA TABLE ── */}
+      <div className="bg-white rounded-3xl shadow-2xl overflow-hidden border border-gray-100">
+        <div className="bg-gradient-to-r from-indigo-50 to-purple-50 p-5 border-b border-gray-200 flex items-center justify-between">
+          <h3 className="text-lg font-black text-gray-800 flex items-center gap-2">
+            <div className="bg-indigo-600 text-white p-1.5 rounded-lg"><Users size={16} /></div>
+            Distributor Fleet
+            <span className="text-sm font-normal text-gray-500 ml-1">({filtered.length} of {distData?.distributors?.length || 0})</span>
+          </h3>
+          {autoRefresh && (
+            <span className="flex items-center gap-1.5 text-xs text-green-600 font-semibold">
+              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse inline-block"></span>
+              Auto-refreshing every 10s
+            </span>
+          )}
+        </div>
+
+        {/* Table header */}
+        <div className="hidden md:grid grid-cols-7 gap-2 px-5 py-3 bg-gray-50 border-b border-gray-100 text-xs font-bold text-gray-500 uppercase tracking-wider">
+          <div className="col-span-2">Distributor</div>
+          <div>Live Status</div>
+          <div>Distance</div>
+          <div>Today's Revenue</div>
+          <div>Stock Level</div>
+          <div>Actions</div>
+        </div>
+
+        {filtered.length === 0 && (
+          <div className="p-12 text-center">
+            <p className="text-4xl mb-3">🏪</p>
+            <p className="text-gray-500 font-semibold">
+              {search ? `No distributors match "${search}"` : "No distributors registered yet"}
+            </p>
+          </div>
+        )}
+
+        {filtered.map((d, idx) => (
+          <div
+            key={d._id}
+            className={`grid md:grid-cols-7 gap-2 px-5 py-4 border-b border-gray-100 hover:bg-indigo-50/30 transition-colors items-center ${idx % 2 === 0 ? '' : 'bg-gray-50/40'}`}
+          >
+            {/* Name + contact */}
+            <div className="col-span-2">
+              <div className="flex items-center gap-3">
+                <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white font-black text-sm flex-shrink-0 ${d.isActive ? 'bg-gradient-to-br from-green-500 to-emerald-600' : 'bg-gradient-to-br from-gray-400 to-gray-500'}`}>
+                  {d.name.charAt(0).toUpperCase()}
+                </div>
+                <div className="min-w-0">
+                  <p className="font-bold text-gray-800 text-sm truncate">{d.name}</p>
+                  <p className="text-xs text-gray-500 truncate">{d.phone || d.email}</p>
+                  {(d.state || d.district) && (
+                    <p className="text-xs text-gray-400 truncate">{[d.district, d.state].filter(Boolean).join(", ")}</p>
+                  )}
+                </div>
               </div>
-              <span className="px-3 py-1 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800">DISTRIBUTOR</span>
+            </div>
+
+            {/* Live status */}
+            <div>
+              {d.isActive ? (
+                <div className="flex flex-col gap-1">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700 w-fit">
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+                    GPS ON
+                  </span>
+                  {d.startTime && (
+                    <span className="text-xs text-gray-400">
+                      Since {new Date(d.startTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-500 w-fit">
+                  <span className="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
+                  Offline
+                </span>
+              )}
+            </div>
+
+            {/* Distance — same 6-decimal precision as the portal */}
+            <div>
+              <p className={`text-sm font-black ${d.isActive ? 'text-orange-600' : 'text-gray-500'}`}>
+                {parseFloat(d.totalDistance || 0).toFixed(2)} km
+              </p>
+              {d.lastLocationTime && (
+                <p className="text-xs text-gray-400">
+                  {new Date(d.lastLocationTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                </p>
+              )}
+            </div>
+
+            {/* Today's revenue */}
+            <div>
+              <p className="text-sm font-black text-teal-700">
+                ₹{(d.todayRevenue || 0).toLocaleString()}
+              </p>
+              <p className="text-xs text-gray-400">{d.todaySalesCount || 0} sale{d.todaySalesCount !== 1 ? 's' : ''}</p>
+            </div>
+
+            {/* Stock level */}
+            <div>
+              <p className={`text-sm font-black ${d.totalStock > 0 ? 'text-purple-700' : 'text-red-500'}`}>
+                {d.totalStock ?? 0} units
+              </p>
+              <p className="text-xs text-gray-400">{d.productCount || 0} product{d.productCount !== 1 ? 's' : ''}</p>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-2 flex-wrap">
+              <button
+                onClick={() => openDetail(d)}
+                className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-colors"
+              >
+                View Details
+              </button>
+              {d.lastLocation?.lat && (
+                <button
+                  onClick={() => {
+                    // Scroll to map tab and focus on this distributor's last location
+                    window.dispatchEvent(new CustomEvent("locateDistributor", { detail: d }))
+                  }}
+                  className="px-3 py-1.5 bg-orange-500 text-white rounded-lg text-xs font-bold hover:bg-orange-600 transition-colors"
+                >
+                  Locate
+                </button>
+              )}
             </div>
           </div>
         ))}
-      </DataSection>
-
-      <div className="grid lg:grid-cols-2 gap-8">
-        {/* Distributor Sales — newest first */}
-        <DataSection title="Distributor Sales" icon={<TrendingUp />}>
-          {distSales.length === 0 && <EmptyState />}
-          {distSales.slice(0, 20).map(s => (
-            <div key={s._id} className="p-4 border-b border-gray-100 hover:bg-gray-50 transition-colors">
-              <div className="flex justify-between items-start mb-1">
-                <div className="flex-1">
-                  <p className="font-bold text-gray-800">{s.productName}</p>
-                  <p className="text-sm text-gray-600">{s.userId?.name || "Distributor"} • {s.quantity} × {s.packSize || "unit"}</p>
-                  <p className="text-xs text-gray-400">{s.village}{s.district ? `, ${s.district}` : ""} • {new Date(s.createdAt).toLocaleString()}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-lg font-black text-green-700">₹{(s.totalAmount || 0).toLocaleString()}</p>
-                  <span className={`px-2 py-1 rounded-full text-xs font-bold ${s.saleType === 'B2C' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}`}>{s.saleType}</span>
-                </div>
-              </div>
-            </div>
-          ))}
-        </DataSection>
-
-        {/* Distributor Inventory */}
-        <DataSection title="Distributor Inventory" icon={<Package />}>
-          {distInventory.length === 0 && <EmptyState />}
-          {distInventory.slice(0, 20).map(item => (
-            <div key={item._id} className="p-4 border-b border-gray-100 hover:bg-gray-50 transition-colors">
-              <div className="flex justify-between items-start">
-                <div>
-                  <p className="font-bold text-gray-800">{item.productName}</p>
-                  <p className="text-sm text-gray-600">{item.distributorId?.name || "Distributor"} • {item.packSize || "—"}</p>
-                  <p className="text-xs text-gray-400">Updated: {new Date(item.lastUpdated).toLocaleString()}</p>
-                </div>
-                <div className="text-right space-y-1">
-                  <p className="text-xs text-gray-500">Received: <span className="font-bold text-teal-700">{item.quantityReceived || 0}</span></p>
-                  <p className="text-xs text-gray-500">Distributed: <span className="font-bold text-purple-700">{item.quantityDistributed || 0}</span></p>
-                  <p className="text-xs text-gray-500">In Stock: <span className={`font-bold ${item.currentStock > 0 ? 'text-green-700' : 'text-red-600'}`}>{item.currentStock || 0}</span></p>
-                </div>
-              </div>
-            </div>
-          ))}
-        </DataSection>
       </div>
 
-      {/* Distributor Attendance — newest first */}
-      <DataSection title="Distributor Attendance" icon={<MapPin />}>
-        {distAttendance.length === 0 && <EmptyState />}
-        {distAttendance.slice(0, 20).map(a => {
-          const isActive = !a.endTime
-          const dMs = a.endTime ? new Date(a.endTime) - new Date(a.startTime) : Date.now() - new Date(a.startTime)
-          const dH = Math.floor(dMs / (1000 * 60 * 60))
-          const dM = Math.floor((dMs % (1000 * 60 * 60)) / (1000 * 60))
-          return (
-            <div key={a._id} className="p-4 border-b border-gray-100 hover:bg-gray-50 transition-colors">
-              <div className="flex justify-between items-start">
-                <div>
-                  <p className="font-bold text-gray-800">{a.userId?.name || "Distributor"}</p>
-                  <p className="text-sm text-gray-600">{new Date(a.startTime).toLocaleDateString()} • {new Date(a.startTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} {a.endTime ? `→ ${new Date(a.endTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "→ ongoing"}</p>
-                  <p className="text-xs text-gray-400">Duration: {dH}h {dM}m</p>
-                </div>
-                <div className="text-right">
-                  <span className={`px-2 py-1 rounded-full text-xs font-bold ${isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>{isActive ? "Active" : "Done"}</span>
-                  <p className="text-sm font-bold text-orange-600 mt-1">{parseFloat(a.totalDistance || 0).toFixed(2)} km</p>
+      {/* ── DETAIL MODAL ── */}
+      {selectedDist && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[3000] flex items-center justify-center p-4" onClick={() => setSelectedDist(null)}>
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-6 rounded-t-3xl flex justify-between items-start">
+              <div>
+                <h3 className="text-xl font-black">{selectedDist.name}</h3>
+                <p className="text-indigo-200 text-sm mt-1">{selectedDist.phone} • {selectedDist.email}</p>
+                <div className="flex gap-3 mt-3">
+                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${selectedDist.isActive ? 'bg-green-400/30 text-green-100' : 'bg-white/20 text-white/70'}`}>
+                    {selectedDist.isActive ? '🟢 GPS Active' : '⚫ Offline'}
+                  </span>
+                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-white/20">
+                    📏 {parseFloat(selectedDist.totalDistance || 0).toFixed(2)} km today
+                  </span>
                 </div>
               </div>
+              <button onClick={() => setSelectedDist(null)} className="text-white/70 hover:text-white text-2xl leading-none">✕</button>
             </div>
-          )
-        })}
-      </DataSection>
+
+            {/* Quick stats */}
+            <div className="grid grid-cols-3 gap-4 p-6 border-b border-gray-100">
+              <div className="text-center">
+                <p className="text-2xl font-black text-teal-700">₹{(selectedDist.todayRevenue || 0).toLocaleString()}</p>
+                <p className="text-xs text-gray-500 mt-1">Today's Revenue</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-black text-purple-700">{selectedDist.totalStock ?? 0}</p>
+                <p className="text-xs text-gray-500 mt-1">Units in Stock</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-black text-orange-600">{selectedDist.todaySalesCount ?? 0}</p>
+                <p className="text-xs text-gray-500 mt-1">Sales Today</p>
+              </div>
+            </div>
+
+            {/* Sales history */}
+            <div className="p-6">
+              <h4 className="font-black text-gray-800 mb-4 flex items-center gap-2">
+                <TrendingUp size={16} className="text-teal-600" /> Sales History
+              </h4>
+              {salesLoading && (
+                <div className="text-center py-8">
+                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-indigo-600 border-t-transparent"></div>
+                </div>
+              )}
+              {!salesLoading && distSales.length === 0 && (
+                <div className="text-center py-8 text-gray-400">
+                  <p className="text-3xl mb-2">📭</p>
+                  <p className="text-sm">No sales recorded yet</p>
+                </div>
+              )}
+              {!salesLoading && distSales.map(s => (
+                <div key={s._id} className="flex justify-between items-start py-3 border-b border-gray-100 last:border-0">
+                  <div>
+                    <p className="font-bold text-gray-800 text-sm">{s.productName}</p>
+                    <p className="text-xs text-gray-500">
+                      {s.quantity}{s.packSize ? ` × ${s.packSize}` : ""} •{" "}
+                      {s.saleType === "B2C" ? (s.farmerName || "Farmer") : (s.distributorName || "Dealer")}
+                    </p>
+                    {s.village && <p className="text-xs text-gray-400">{s.village}{s.district ? `, ${s.district}` : ""}</p>}
+                    <p className="text-xs text-gray-400">{new Date(s.createdAt).toLocaleString()}</p>
+                  </div>
+                  <div className="text-right flex-shrink-0 ml-4">
+                    <p className="font-black text-green-700">₹{(s.totalAmount || 0).toLocaleString()}</p>
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${s.saleType === "B2C" ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-700"}`}>
+                      {s.saleType}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }
