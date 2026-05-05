@@ -101,7 +101,8 @@ export default function Login() {
   }
 
   const inputStyle = {
-    width: '100%', padding: '14px 44px',
+    width: '100%',
+    padding: '14px 44px 14px 56px',   // left: 56px gives clear breathing room after icon
     border: `1.5px solid ${C.border}`, borderRadius: '16px',
     outline: 'none', background: C.inputBg, color: C.navy,
     fontSize: '14px', fontFamily: 'Poppins, sans-serif',
@@ -235,7 +236,7 @@ export default function Login() {
           </div>
 
           <div style={{ minHeight: '260px' }}>
-            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <form onSubmit={handleSubmit} autoComplete="off" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {isSignup && (
                 <>
                   <FieldInput icon={<User size={16} color={C.muted} />} type="text" name="name" placeholder="Full Name" value={formData.name} onChange={handleChange} required style={inputStyle} onFocus={onFocus} onBlur={onBlur} />
@@ -262,13 +263,36 @@ export default function Login() {
                   style={inputStyle}
                   onFocus={onFocus}
                   onBlur={onBlur}
-                  autoComplete="username"
+                  autoComplete="off"
                 />
               )}
 
               <div style={{ position: 'relative' }}>
-                <div style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}><Lock size={16} color={C.muted} /></div>
-                <input type={showPassword ? 'text' : 'password'} name="password" placeholder="Password" value={formData.password} onChange={handleChange} required style={{ ...inputStyle, paddingRight: '44px' }} onFocus={onFocus} onBlur={onBlur} />
+                <div style={{
+                  position: 'absolute', left: '14px', top: '50%',
+                  transform: 'translateY(-50%)', pointerEvents: 'none',
+                  opacity: formData.password ? 0 : 1,
+                  transition: 'opacity 0.2s ease',
+                }}>
+                  <Lock size={16} color={C.muted} />
+                </div>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  name="password"
+                  placeholder="Password"
+                  value={formData.password}
+                  onChange={handleChange}
+                  required
+                  autoComplete="new-password"
+                  style={{
+                    ...inputStyle,
+                    paddingLeft: formData.password ? '16px' : '52px',
+                    paddingRight: '44px',
+                    transition: 'padding-left 0.2s ease, border-color 0.2s, box-shadow 0.2s',
+                  }}
+                  onFocus={onFocus}
+                  onBlur={onBlur}
+                />
                 <button type="button" onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: C.muted, padding: '4px' }}>
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
@@ -416,11 +440,31 @@ function SocialBtn({ label, icon, onClick }) {
   )
 }
 
-function FieldInput({ icon, style, onFocus, onBlur, ...props }) {
+function FieldInput({ icon, style, onFocus, onBlur, value, ...props }) {
+  // Hide the left icon as soon as the user starts typing, reveal when empty.
+  // paddingLeft shrinks smoothly so text uses the full width while typing.
+  const hasValue = value !== undefined && value !== ''
   return (
     <div style={{ position: 'relative' }}>
-      <div style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>{icon}</div>
-      <input {...props} style={style} onFocus={onFocus} onBlur={onBlur} />
+      <div style={{
+        position: 'absolute', left: '14px', top: '50%',
+        transform: 'translateY(-50%)', pointerEvents: 'none',
+        opacity: hasValue ? 0 : 1,
+        transition: 'opacity 0.2s ease',
+      }}>
+        {icon}
+      </div>
+      <input
+        {...props}
+        value={value}
+        style={{
+          ...style,
+          paddingLeft: hasValue ? '16px' : '56px',
+          transition: 'padding-left 0.2s ease, border-color 0.2s, box-shadow 0.2s',
+        }}
+        onFocus={onFocus}
+        onBlur={onBlur}
+      />
     </div>
   )
 }
