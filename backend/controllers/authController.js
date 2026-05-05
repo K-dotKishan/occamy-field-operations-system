@@ -24,12 +24,25 @@ export async function signup(req, res) {
 
         const hashedPassword = await bcrypt.hash(password, 10)
 
+        // Normalize role: map any variant to the exact enum value in the schema
+        const ROLE_MAP = {
+            "FIELD_OFFICER": "FIELD",
+            "FIELD OFFICER": "FIELD",
+            "FIELDOFFICER": "FIELD",
+            "FIELD": "FIELD",
+            "ADMIN": "ADMIN",
+            "DISTRIBUTOR": "DISTRIBUTOR",
+            "USER": "USER"
+        }
+        const rawRole = (role || "USER").toUpperCase().trim()
+        const normalizedRole = ROLE_MAP[rawRole] || "USER"
+
         await User.create({
             name: name.trim(),
             phone: cleanPhone,
             email: cleanEmail,
             password: hashedPassword,
-            role: (role || "USER").toUpperCase()
+            role: normalizedRole
         })
 
         res.status(201).json({ message: "Signup successful" })
