@@ -1,3 +1,4 @@
+import mongoose from "mongoose"
 import {
     Attendance, Activity, Sale, Sample, User,
     LocationLog, AdminMessage, DistributorInventory
@@ -371,45 +372,132 @@ export async function getFieldOfficers(req, res) {
     try {
         if (req.user.role !== "ADMIN") return res.status(403).json({ error: "Forbidden" })
 
+        // Role in the User schema enum is "FIELD" (all caps) — confirmed from models/index.js
         const fieldOfficers = await User.find({ role: "FIELD" }).select("-password").lean()
-        const officerIds = fieldOfficers.map(u => u._id)
 
-        const lastLocations = await LocationLog.aggregate([
-            { $match: { userId: { $in: officerIds } } },
-            { $sort: { timestamp: -1 } },
-            { $group: { _id: "$userId", location: { $first: "$location" }, timestamp: { $first: "$timestamp" } } }
-        ])
+        if (fieldOfficers.length === 0) {
+            // Return empty but valid response so the frontend shows the empty state
+            return res.json({
+                officers: [],
+                summary: { totalOfficers: 0, activeNow: 0, totalMeetingsToday: 0, totalSamplesToday: 0, totalFleetDistance: 0 }
+            })
+        }
+
+        // Cast to mongoose ObjectId for aggregation pipeline compatibility
+        const officerIds = fieldOfficers.map(u => new mongoose.Types.ObjectId(u._id))
 
         const today = new Date(); today.setHours(0, 0, 0, 0)
-        const todayAttendances = await Attendance.find({ userId: { $in: officerIds }, startTime: { $gte: today } }).select("userId totalDistance endTime").lean()
-        const todayActivities = await Activity.aggregate([
-            { $match: { userId: { $in: officerIds }, createdAt: { $gte: today } } },
-            { $group: { _id: "$userId", count: { $sum: 1 } } }
+
+        // All queries run in parallel for performance
+        const [
+            activeAttendances,
+            todayAttendances,
+            todayMeetingsAgg,
+            todaySamplesAgg,
+            lastLocations
+        ] = await Promise.all([
+            // Open attendance sessions → GPS active + live distance
+            Attendance.find({ userId: { $in: officerIds }, endTime: null })
+                .select("userId totalDistance startTime")
+                .lean(),
+
+            // Today's closed + open attendance → total distance today
+            Attendance.find({ userId: { $in: officerIds }, startTime: { $gte: today } })
+                .select("userId totalDistance endTime")
+                .lean(),
+
+            // Today's meetings per officer (aggregation needs ObjectId cast)
+            Activity.aggregate([
+                { $match: { userId: { $in: officerIds }, createdAt: { $gte: today } } },
+                { $group: { _id: "$userId", meetingsToday: { $sum: 1 } } }
+            ]),
+
+            // Today's samples per officer
+            Sample.aggregate([
+                { $match: { userId: { $in: officerIds }, createdAt: { $gte: today } } },
+                { $group: { _id: "$userId", samplesToday: { $sum: 1 } } }
+            ]),
+
+            // Most recent GPS point per officer
+            LocationLog.aggregate([
+                { $match: { userId: { $in: officerIds } } },
+                { $sort: { timestamp: -1 } },
+                {
+                    $group: {
+                        _id: "$userId",
+                        location: { $first: "$location" },
+                        timestamp: { $first: "$timestamp" },
+                        accuracy: { $first: "$accuracy" }
+                    }
+                }
+            ])
         ])
 
-        const locationMap = new Map(lastLocations.map(l => [l._id.toString(), l]))
-        const attendanceMap = new Map()
-        const meetingMap = new Map(todayActivities.map(a => [a._id.toString(), a.count]))
+        // Build O(1) lookup maps — keys are string IDs
+        const activeAttMap = new Map(activeAttendances.map(a => [a.userId.toString(), a]))
+        const meetingMap   = new Map(todayMeetingsAgg.map(m => [m._id.toString(), m.meetingsToday]))
+        const sampleMap    = new Map(todaySamplesAgg.map(s => [s._id.toString(), s.samplesToday]))
+        const locationMap  = new Map(lastLocations.map(l => [l._id.toString(), l]))
 
+        // Sum today's distance per officer (handles multiple sessions in one day)
+        const distanceMap = new Map()
         todayAttendances.forEach(a => {
-            if (!attendanceMap.has(a.userId.toString())) attendanceMap.set(a.userId.toString(), [])
-            attendanceMap.get(a.userId.toString()).push(a)
+            const id = a.userId.toString()
+            distanceMap.set(id, (distanceMap.get(id) || 0) + (a.totalDistance || 0))
         })
 
-        res.json(fieldOfficers.map(officer => {
-            const loc = locationMap.get(officer._id.toString())
-            const userAttendances = attendanceMap.get(officer._id.toString()) || []
+        const result = fieldOfficers.map(officer => {
+            const id  = officer._id.toString()
+            const att = activeAttMap.get(id)
+            const loc = locationMap.get(id)
+
             return {
-                _id: officer._id, name: officer.name, email: officer.email, phone: officer.phone,
-                lastLocation: loc?.location || null, lastUpdate: loc?.timestamp || null,
-                totalDistance: userAttendances.reduce((sum, a) => sum + (a.totalDistance || 0), 0),
-                meetingsToday: meetingMap.get(officer._id.toString()) || 0,
-                isOnline: userAttendances.some(a => !a.endTime), battery: 100
+                _id:              officer._id,
+                name:             officer.name,
+                email:            officer.email,
+                phone:            officer.phone,
+                state:            officer.state,
+                district:         officer.district,
+                isActive:         !!att,
+                startTime:        att?.startTime || null,
+                totalDistance:    parseFloat((distanceMap.get(id) || 0).toFixed(6)),
+                lastLocation:     loc?.location  || null,
+                lastLocationTime: loc?.timestamp || null,
+                locationAccuracy: loc?.accuracy  || null,
+                meetingsToday:    meetingMap.get(id) || 0,
+                samplesToday:     sampleMap.get(id)  || 0
             }
-        }))
+        })
+
+        const summary = {
+            totalOfficers:      result.length,
+            activeNow:          result.filter(o => o.isActive).length,
+            totalMeetingsToday: result.reduce((s, o) => s + o.meetingsToday, 0),
+            totalSamplesToday:  result.reduce((s, o) => s + o.samplesToday, 0),
+            totalFleetDistance: parseFloat(result.reduce((s, o) => s + o.totalDistance, 0).toFixed(6))
+        }
+
+        res.json({ officers: result, summary })
     } catch (err) {
         console.error("Fetch field officers error:", err)
         res.status(500).json({ error: "Failed to fetch field officers" })
+    }
+}
+
+/* ================= OFFICER MEETING HISTORY ================= */
+export async function getOfficerMeetings(req, res) {
+    try {
+        if (req.user.role !== "ADMIN") return res.status(403).json({ error: "Forbidden" })
+
+        const meetings = await Activity.find({ userId: req.params.officerId })
+            .sort({ createdAt: -1 })
+            .limit(100)
+            .lean()
+
+        res.json(meetings)
+    } catch (err) {
+        console.error("Get officer meetings error:", err)
+        res.status(500).json({ error: "Failed to fetch officer meetings" })
     }
 }
 
