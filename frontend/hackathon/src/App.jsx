@@ -4,11 +4,11 @@ import Signup from "./pages/Signup"
 import Dashboard from "./pages/Dashboard"
 import AdminDashboard from "./pages/AdminDashboard"
 import FieldDashboard from "./pages/FieldDashboard"
-import FieldOfficers from "./pages/FieldOfficers"
 import AdminCharts from "./pages/AdminCharts"
 import Inventory from "./pages/Inventory"
 import DistributorDashboard from "./pages/DistributorDashboard"
 import AdminDistributors from "./pages/AdminDistributors"
+import AdminFieldOfficers from "./pages/AdminFieldOfficers"
 import ProtectedRoute from "./components/ProtectedRoute"
 
 export default function App() {
@@ -20,7 +20,7 @@ export default function App() {
 
         <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/admin-dashboard" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
-        <Route path="/admin/field-officers" element={<ProtectedRoute><FieldOfficers /></ProtectedRoute>} />
+        <Route path="/admin/field-officers" element={<ProtectedRoute><AdminFieldOfficers /></ProtectedRoute>} />
         <Route path="/admin/distributors" element={<ProtectedRoute><AdminDistributors /></ProtectedRoute>} />
         <Route path="/field-dashboard" element={<ProtectedRoute><FieldDashboard /></ProtectedRoute>} />
         <Route path="/admin-charts" element={<ProtectedRoute><AdminCharts /></ProtectedRoute>} />

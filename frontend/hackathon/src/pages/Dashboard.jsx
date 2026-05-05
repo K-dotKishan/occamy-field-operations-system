@@ -1131,7 +1131,7 @@ export default function Dashboard() {
                 {/* Stats Cards - Only show when not in fullscreen */}
                 {!isMapFullscreen && (
                   <>
-                    {/* Main Stats Grid - All with same blue color */}
+                    {/* Main Stats Grid */}
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-6 mb-6">
                       <StatCard
                         label="USERS"
@@ -1139,14 +1139,19 @@ export default function Dashboard() {
                         icon={<Users size={20} />}
                         color="from-blue-500 to-cyan-600"
                       />
-                      {/* FIELD TRACKING - Replaced Active Field */}
+
+                      {/* FIELD TRACKING — stays on main page, scrolls to live map */}
                       <div
-                        onClick={() => navigate('/admin/field-officers')}
+                        onClick={() => {
+                          const el = document.getElementById("map-section")
+                          if (el) el.scrollIntoView({ behavior: "smooth", block: "start" })
+                          else window.scrollTo({ top: 400, behavior: "smooth" })
+                        }}
                         className="cursor-pointer transition-transform hover:scale-105"
                       >
                         <StatCard
                           label="FIELD TRACKING"
-                          value={adminData?.users?.filter(u => u.role === 'FIELD').length || 0}
+                          value={`${Object.values(typeof liveUsers === 'object' ? liveUsers : {}).filter(u => u.status === 'active').length}/${adminData?.users?.filter(u => u.role === 'FIELD').length || 0} active`}
                           icon={<Map size={20} />}
                           color="from-blue-500 to-cyan-600"
                           delay={100}
@@ -1154,17 +1159,17 @@ export default function Dashboard() {
                         />
                       </div>
 
-                      {/* SALES */}
+                      {/* FIELD OFFICERS — navigates to dedicated Field Officer Control Center */}
                       <div
-                        onClick={() => navigate('/admin-dashboard')}
+                        onClick={() => navigate('/admin/field-officers')}
                         className="cursor-pointer transition-transform hover:scale-105"
                       >
                         <StatCard
-                          label="SALES"
-                          value={adminData?.stats?.totalSales || 0}
-                          icon={<TrendingUp size={20} />}
+                          label="FIELD OFFICERS"
+                          value={adminData?.users?.filter(u => u.role === 'FIELD').length || 0}
+                          icon={<Users size={20} />}
                           color="from-blue-500 to-indigo-600"
-                          delay={300}
+                          delay={200}
                         />
                       </div>
 
@@ -1182,7 +1187,7 @@ export default function Dashboard() {
                         />
                       </div>
 
-                      {/* DISTRIBUTORS — 5th card, navigates to dedicated page */}
+                      {/* DISTRIBUTORS — navigates to Distributor Control Center */}
                       <div
                         onClick={() => navigate('/admin/distributors')}
                         className="cursor-pointer transition-transform hover:scale-105"

@@ -279,7 +279,7 @@ export default function Login() {
                   <div style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}><User size={16} color={C.muted} /></div>
                   <select name="role" value={formData.role} onChange={handleChange} style={{ ...inputStyle, appearance: 'none', cursor: 'pointer' }}>
                     <option value="USER">👤 Customer (Buy Products)</option>
-                    <option value="FIELD_OFFICER">🚜 Field Officer</option>
+                    <option value="FIELD">🚜 Field Officer</option>
                     <option value="DISTRIBUTOR">🏪 Distributor</option>
                   </select>
                 </div>
