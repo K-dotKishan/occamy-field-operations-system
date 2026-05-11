@@ -394,6 +394,7 @@ export async function getFieldOfficers(req, res) {
             todayAttendances,
             todayMeetingsAgg,
             todaySamplesAgg,
+            todayMeetingSamplesAgg,
             lastLocations
         ] = await Promise.all([
             // Open attendance sessions → GPS active + live distance
@@ -412,10 +413,16 @@ export async function getFieldOfficers(req, res) {
                 { $group: { _id: "$userId", meetingsToday: { $sum: 1 } } }
             ]),
 
-            // Today's samples per officer
+            // Today's samples per officer — counts BOTH Sample records AND meetings where productSampleGiven=true
             Sample.aggregate([
                 { $match: { userId: { $in: officerIds }, createdAt: { $gte: today } } },
                 { $group: { _id: "$userId", samplesToday: { $sum: 1 } } }
+            ]),
+
+            // Today's meeting-based samples (productSampleGiven=true in Activity)
+            Activity.aggregate([
+                { $match: { userId: { $in: officerIds }, createdAt: { $gte: today }, productSampleGiven: true } },
+                { $group: { _id: "$userId", meetingSamplesToday: { $sum: 1 } } }
             ]),
 
             // Most recent GPS point per officer
@@ -434,10 +441,11 @@ export async function getFieldOfficers(req, res) {
         ])
 
         // Build O(1) lookup maps — keys are string IDs
-        const activeAttMap = new Map(activeAttendances.map(a => [a.userId.toString(), a]))
-        const meetingMap   = new Map(todayMeetingsAgg.map(m => [m._id.toString(), m.meetingsToday]))
-        const sampleMap    = new Map(todaySamplesAgg.map(s => [s._id.toString(), s.samplesToday]))
-        const locationMap  = new Map(lastLocations.map(l => [l._id.toString(), l]))
+        const activeAttMap      = new Map(activeAttendances.map(a => [a.userId.toString(), a]))
+        const meetingMap        = new Map(todayMeetingsAgg.map(m => [m._id.toString(), m.meetingsToday]))
+        const sampleMap         = new Map(todaySamplesAgg.map(s => [s._id.toString(), s.samplesToday]))
+        const meetingSampleMap  = new Map(todayMeetingSamplesAgg.map(s => [s._id.toString(), s.meetingSamplesToday]))
+        const locationMap       = new Map(lastLocations.map(l => [l._id.toString(), l]))
 
         // Sum today's distance per officer (handles multiple sessions in one day)
         const distanceMap = new Map()
@@ -465,7 +473,8 @@ export async function getFieldOfficers(req, res) {
                 lastLocationTime: loc?.timestamp || null,
                 locationAccuracy: loc?.accuracy  || null,
                 meetingsToday:    meetingMap.get(id) || 0,
-                samplesToday:     sampleMap.get(id)  || 0
+                // samplesToday = Sample records + meetings where productSampleGiven=true
+                samplesToday:     (sampleMap.get(id) || 0) + (meetingSampleMap.get(id) || 0)
             }
         })
 
@@ -629,5 +638,115 @@ export async function getDistributorSales(req, res) {
     } catch (err) {
         console.error("Get distributor sales error:", err)
         res.status(500).json({ error: "Failed to fetch distributor sales" })
+    }
+}
+
+/* ================= DISTRIBUTOR ANALYTICS (charts + inventory) ================= */
+export async function getDistributorAnalytics(req, res) {
+    try {
+        if (req.user.role !== "ADMIN") return res.status(403).json({ error: "Forbidden" })
+
+        const { distributorId } = req.params
+        const days = parseInt(req.query.days) || 30
+        const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+        startDate.setHours(0, 0, 0, 0)
+
+        const [sales, inventory] = await Promise.all([
+            Sale.find({ userId: distributorId, createdAt: { $gte: startDate } })
+                .sort({ createdAt: 1 })
+                .lean(),
+            DistributorInventory.find({ distributorId })
+                .sort({ lastUpdated: -1 })
+                .lean()
+        ])
+
+        // Build daily sales chart data
+        const dailyMap = {}
+        sales.forEach(s => {
+            const day = new Date(s.createdAt).toISOString().split("T")[0]
+            if (!dailyMap[day]) dailyMap[day] = { date: day, quantity: 0, revenue: 0, count: 0 }
+            dailyMap[day].quantity += s.quantity || 0
+            dailyMap[day].revenue  += s.totalAmount || 0
+            dailyMap[day].count    += 1
+        })
+        const dailyChart = Object.values(dailyMap).sort((a, b) => a.date.localeCompare(b.date))
+
+        // Inventory summary with correct math: received - sold
+        const allSales = await Sale.find({ userId: distributorId }).lean()
+        const inventorySummary = inventory.map(item => {
+            const sold = allSales
+                .filter(s => s.productName === item.productName)
+                .reduce((sum, s) => sum + (s.quantity || 0), 0)
+            return {
+                productName:      item.productName,
+                packSize:         item.packSize,
+                quantityReceived: item.quantityReceived || 0,
+                quantityDistributed: sold,
+                currentStock:     Math.max(0, (item.quantityReceived || 0) - sold),
+                pricePerUnit:     item.pricePerUnit || 0,
+                lastUpdated:      item.lastUpdated
+            }
+        })
+
+        const totalRevenue   = sales.reduce((s, x) => s + (x.totalAmount || 0), 0)
+        const totalStock     = inventorySummary.reduce((s, i) => s + i.currentStock, 0)
+        const totalReceived  = inventorySummary.reduce((s, i) => s + i.quantityReceived, 0)
+        const totalSold      = inventorySummary.reduce((s, i) => s + i.quantityDistributed, 0)
+
+        res.json({
+            dailyChart,
+            inventorySummary,
+            summary: { totalRevenue, totalStock, totalReceived, totalSold, salesCount: sales.length }
+        })
+    } catch (err) {
+        console.error("Distributor analytics error:", err)
+        res.status(500).json({ error: "Failed to fetch distributor analytics" })
+    }
+}
+
+/* ================= GLOBAL MONTHLY DISTRIBUTOR CHART ================= */
+export async function getDistributorMonthlyChart(req, res) {
+    try {
+        if (req.user.role !== "ADMIN") return res.status(403).json({ error: "Forbidden" })
+
+        const now = new Date()
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+        const endOfMonth   = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59)
+
+        const distributors = await User.find({ role: "DISTRIBUTOR" }).select("_id").lean()
+        const distIds = distributors.map(d => d._id)
+
+        const sales = await Sale.find({
+            userId: { $in: distIds },
+            createdAt: { $gte: startOfMonth, $lte: endOfMonth }
+        }).sort({ createdAt: 1 }).lean()
+
+        // Aggregate by day
+        const dailyMap = {}
+        for (let d = 1; d <= endOfMonth.getDate(); d++) {
+            const dateStr = new Date(now.getFullYear(), now.getMonth(), d).toISOString().split("T")[0]
+            dailyMap[dateStr] = { date: dateStr, quantity: 0, revenue: 0, count: 0 }
+        }
+        sales.forEach(s => {
+            const day = new Date(s.createdAt).toISOString().split("T")[0]
+            if (dailyMap[day]) {
+                dailyMap[day].quantity += s.quantity || 0
+                dailyMap[day].revenue  += s.totalAmount || 0
+                dailyMap[day].count    += 1
+            }
+        })
+
+        res.json({
+            chart: Object.values(dailyMap),
+            summary: {
+                totalRevenue:  sales.reduce((s, x) => s + (x.totalAmount || 0), 0),
+                totalQuantity: sales.reduce((s, x) => s + (x.quantity || 0), 0),
+                totalSales:    sales.length,
+                month:         startOfMonth.toLocaleString("default", { month: "long", year: "numeric" })
+            }
+        })
+    } catch (err) {
+        console.error("Monthly distributor chart error:", err)
+        res.status(500).json({ error: "Failed to fetch monthly chart" })
     }
 }
