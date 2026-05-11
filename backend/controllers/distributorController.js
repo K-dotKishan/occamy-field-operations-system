@@ -396,3 +396,51 @@ export async function getAttendanceHistory(req, res) {
         res.status(500).json({ error: "Failed to fetch attendance history" })
     }
 }
+
+/* ================= INVENTORY HISTORY (per product, with daily breakdown) ================= */
+export async function getInventoryHistory(req, res) {
+    try {
+        if (!requireDistributor(req, res)) return
+
+        // All inventory records for this distributor
+        const inventory = await DistributorInventory.find({ distributorId: req.user.id })
+            .sort({ lastUpdated: -1 })
+            .lean()
+
+        // All sales — to compute per-product sold quantities
+        const sales = await Sale.find({ userId: req.user.id })
+            .sort({ createdAt: -1 })
+            .lean()
+
+        // Build per-product summary: received, sold, remaining
+        const result = inventory.map(item => {
+            const productSales = sales.filter(s => s.productName === item.productName)
+            const totalSold = productSales.reduce((sum, s) => sum + (s.quantity || 0), 0)
+            const remaining = Math.max(0, (item.quantityReceived || 0) - totalSold)
+
+            return {
+                _id:               item._id,
+                productName:       item.productName,
+                productSKU:        item.productSKU,
+                packSize:          item.packSize,
+                quantityReceived:  item.quantityReceived || 0,
+                quantityDistributed: totalSold,
+                currentStock:      remaining,
+                pricePerUnit:      item.pricePerUnit || 0,
+                lastUpdated:       item.lastUpdated,
+                // Daily sales breakdown for this product
+                salesHistory: productSales.map(s => ({
+                    date:     s.createdAt,
+                    quantity: s.quantity,
+                    amount:   s.totalAmount,
+                    saleType: s.saleType
+                }))
+            }
+        })
+
+        res.json(result)
+    } catch (err) {
+        console.error("Inventory history error:", err)
+        res.status(500).json({ error: "Failed to fetch inventory history" })
+    }
+}

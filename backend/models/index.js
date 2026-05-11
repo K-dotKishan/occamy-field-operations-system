@@ -64,7 +64,8 @@ const userSchema = new mongoose.Schema(
         },
         state: String,
         district: String,
-        assignedRegions: [String] // Villages/regions assigned to field officer
+        assignedRegions: [String], // Villages/regions assigned to field officer
+        enterpriseName: String     // Business/enterprise name for distributors
     },
     { timestamps: true }
 )
@@ -110,7 +111,7 @@ export const Activity = mongoose.model(
             // Person details (for ONE_TO_ONE)
             personName: String,
             contactNumber: String,
-            category: { type: String, enum: ["FARMER", "SELLER", "INFLUENCER", "VETERINARIAN"] },
+            category: { type: String, enum: ["FARMER", "SELLER", "INFLUENCER", "VETERINARIAN", "DAIRY_COLLECTION_CENTER", "RETAIL_OUTLET", "KVK", "FPO", "DISTRIBUTOR", "DEALER"] },
 
             // Business potential
             businessPotential: {
@@ -135,6 +136,11 @@ export const Activity = mongoose.model(
             followerCount: String,  // For Influencer
             agencyName: String,     // For Distributor
             territory: String,      // For Distributor
+
+            // Sample tracking (replaces landSize/cropType for new categories)
+            productSampleAvailable: { type: Boolean, default: false },
+            productSampleGiven:     { type: Boolean, default: false },
+            entityName:             String,  // Name of Dairy Center / Retail Outlet / KVK / FPO
 
             // Location & media
             location: { lat: Number, lng: Number, address: String },

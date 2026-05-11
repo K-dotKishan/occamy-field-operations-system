@@ -158,11 +158,11 @@ export default function FieldDashboard() {
       {/* Today's Summary */}
       {summary && (
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <SummaryCard label="Meetings" value={summary.meetings} icon="📅" color="blue" />
-          <SummaryCard label="Samples" value={summary.samples} icon="📦" color="purple" />
-          <SummaryCard label="Sales" value={summary.sales} icon="💰" color="green" />
-          <SummaryCard label="Revenue" value={`₹${summary.revenue.toLocaleString()}`} icon="💵" color="emerald" />
-          <SummaryCard label="Distance" value={`${summary.distanceTraveled} km`} icon="🚗" color="amber" />
+          <SummaryCard label="Meetings" value={summary?.meetings ?? 0} icon="Meetings" color="blue" />
+          <SummaryCard label="Samples" value={summary?.samples ?? 0} icon="Samples" color="purple" />
+          <SummaryCard label="Sales" value={summary?.sales ?? 0} icon="Sales" color="green" />
+          <SummaryCard label="Revenue" value={`Rs.${(summary?.revenue ?? 0).toLocaleString()}`} icon="Revenue" color="emerald" />
+          <SummaryCard label="Distance" value={`${summary?.distanceTraveled ?? 0} km`} icon="Distance" color="amber" />
         </div>
       )}
 
@@ -242,7 +242,7 @@ function ActionButton({ icon, label, subtitle, color, onClick, disabled }) {
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`bg-gradient-to-br ${color} text-white p-6 rounded-2xl shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-300 group ${disabled ? 'opacity-50 cursor-not-allowed' : ''
+      className={`bg-gradient-to-br from-[#3b758c] to-[#1797a6] text-white p-6 rounded-2xl shadow-md hover:opacity-90 transition-all duration-300 group ${disabled ? 'opacity-50 cursor-not-allowed' : ''
         }`}
     >
       <div className="flex flex-col items-center gap-3">
@@ -260,12 +260,12 @@ function ActionButton({ icon, label, subtitle, color, onClick, disabled }) {
 
 function SummaryCard({ label, value, icon, color }) {
   return (
-    <div className={`bg-white p-6 rounded-2xl shadow-lg border-2 border-${color}-200 hover:border-${color}-400 transition-all`}>
+    <div className="bg-gradient-to-br from-[#3b758c] to-[#1797a6] text-white p-6 rounded-2xl shadow-md hover:opacity-90 transition-all">
       <div className="flex justify-between items-start mb-2">
         <span className="text-3xl">{icon}</span>
       </div>
-      <p className="text-2xl font-black text-gray-800">{value}</p>
-      <p className="text-xs text-gray-500 font-semibold mt-1">{label}</p>
+      <p className="text-2xl font-black">{value}</p>
+      <p className="text-xs opacity-80 font-semibold mt-1">{label}</p>
     </div>
   )
 }
@@ -286,7 +286,11 @@ function MeetingForm({ onClose }) {
     estimatedVolume: 0,
     likelihood: "MEDIUM",
     notes: "",
-    followUpRequired: false
+    followUpRequired: false,
+    dateOfReceipt: "",
+    dateOfSale: "",
+    quantityReceived: 0,
+    quantitySold: 0,
   })
   const [photos, setPhotos] = useState([])
 
@@ -388,15 +392,24 @@ function MeetingForm({ onClose }) {
           <>
             <Input label="Person Name" value={formData.personName} onChange={v => setFormData({ ...formData, personName: v })} required />
             <Input label="Contact Number" type="tel" value={formData.contactNumber} onChange={v => setFormData({ ...formData, contactNumber: v })} />
-            <Select label="Category" value={formData.category} onChange={v => setFormData({ ...formData, category: v })} options={["FARMER", "SELLER", "INFLUENCER", "VETERINARIAN"]} />
+            <Select label="Category" value={formData.category} onChange={v => setFormData({ ...formData, category: v })} options={["FARMER", "SELLER", "INFLUENCER", "VETERINARIAN", "DISTRIBUTOR", "DEALER", "RETAIL_OUTLET", "KVK", "FPO", "DDB"]} />
             <Input label="Estimated Volume (kg)" type="number" value={formData.estimatedVolume} onChange={v => setFormData({ ...formData, estimatedVolume: v })} />
             <Select label="Business Likelihood" value={formData.likelihood} onChange={v => setFormData({ ...formData, likelihood: v })} options={["LOW", "MEDIUM", "HIGH"]} />
+            <Input label="Date of Receipt" type="date" value={formData.dateOfReceipt} onChange={v => setFormData({ ...formData, dateOfReceipt: v })} />
+            <Input label="Date of Sale" type="date" value={formData.dateOfSale} onChange={v => setFormData({ ...formData, dateOfSale: v })} />
+            <Input label="Quantity Received" type="number" value={formData.quantityReceived} onChange={v => setFormData({ ...formData, quantityReceived: v })} />
+            <Input label="Quantity Sold" type="number" value={formData.quantitySold} onChange={v => setFormData({ ...formData, quantitySold: v })} />
           </>
         ) : (
           <>
             <Input label="Village" value={formData.village} onChange={v => setFormData({ ...formData, village: v })} required />
             <Input label="Number of Attendees" type="number" value={formData.attendeesCount} onChange={v => setFormData({ ...formData, attendeesCount: v })} required />
+            <Select label="Category" value={formData.category} onChange={v => setFormData({ ...formData, category: v })} options={["FARMER", "SELLER", "INFLUENCER", "VETERINARIAN", "DISTRIBUTOR", "DEALER", "RETAIL_OUTLET", "KVK", "FPO", "DDB"]} />
             <Select label="Meeting Type" value={formData.meetingType} onChange={v => setFormData({ ...formData, meetingType: v })} options={["DEMO", "TRAINING", "FEEDBACK", "AWARENESS"]} />
+            <Input label="Date of Receipt" type="date" value={formData.dateOfReceipt} onChange={v => setFormData({ ...formData, dateOfReceipt: v })} />
+            <Input label="Date of Sale" type="date" value={formData.dateOfSale} onChange={v => setFormData({ ...formData, dateOfSale: v })} />
+            <Input label="Quantity Received" type="number" value={formData.quantityReceived} onChange={v => setFormData({ ...formData, quantityReceived: v })} />
+            <Input label="Quantity Sold" type="number" value={formData.quantitySold} onChange={v => setFormData({ ...formData, quantitySold: v })} />
           </>
         )}
 

@@ -105,32 +105,32 @@ function OverviewTab({ data, colors }) {
           label="TOTAL USERS"
           value={data.stats?.totalUsers}
           icon={<Users size={28} />}
-          color="from-blue-500 to-blue-700"
+          color="from-[#3b758c] to-[#1797a6]"
         />
         <StatCard
           label="MEETINGS"
           value={data.stats?.totalMeetings}
           icon={<Calendar size={28} />}
-          color="from-purple-500 to-purple-700"
-          subtitle={`${data.stats?.conversionRate}% converted`}
+          color="from-[#3b758c] to-[#1797a6]"
+          subtitle={`${data.stats?.conversionRate ?? 0}% converted`}
         />
         <StatCard
           label="SALES"
           value={data.stats?.totalSales}
           icon={<TrendingUp size={28} />}
-          color="from-emerald-500 to-emerald-700"
+          color="from-[#3b758c] to-[#1797a6]"
         />
         <StatCard
           label="SAMPLES"
           value={data.stats?.totalSamples}
           icon={<Package size={28} />}
-          color="from-amber-500 to-amber-700"
+          color="from-[#3b758c] to-[#1797a6]"
         />
         <StatCard
           label="REVENUE"
-          value={`₹${(data.stats?.totalRevenue || 0).toLocaleString()}`}
-          icon={<span className="text-2xl">💰</span>}
-          color="from-green-600 to-green-800"
+          value={`Rs.${(data.stats?.totalRevenue || 0).toLocaleString()}`}
+          icon={<span className="text-lg font-black">Rs.</span>}
+          color="from-[#3b758c] to-[#1797a6]"
           subtitle={`${data.stats?.totalDistance || 0}km traveled`}
         />
       </div>
@@ -339,11 +339,11 @@ function DistributorsTab({ data }) {
       {/* ── STAT ROW ── */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         {[
-          { label: "TOTAL DISTRIBUTORS", value: s.totalDistributors ?? 0,       color: "from-indigo-500 to-indigo-700",  icon: <Users size={22} /> },
-          { label: "ACTIVE TODAY",        value: s.activeDistributors ?? 0,      color: "from-green-500 to-emerald-700",  icon: <span className="text-lg">🟢</span> },
-          { label: "FLEET DISTANCE",      value: `${parseFloat(s.totalFleetDistance || 0).toFixed(2)} km`, color: "from-orange-500 to-amber-600", icon: <MapPin size={22} /> },
-          { label: "TODAY'S REVENUE",     value: `₹${(s.totalTodayRevenue || 0).toLocaleString()}`, color: "from-teal-500 to-teal-700", icon: <TrendingUp size={22} /> },
-          { label: "TOTAL STOCK",         value: s.totalStock ?? 0,              color: "from-purple-500 to-purple-700",  icon: <Package size={22} /> },
+          { label: "TOTAL DISTRIBUTORS", value: s.totalDistributors ?? 0,       color: "from-[#3b758c] to-[#1797a6]",  icon: <Users size={22} /> },
+          { label: "ACTIVE TODAY",        value: s.activeDistributors ?? 0,      color: "from-[#3b758c] to-[#1797a6]",  icon: <span className="text-lg">Active</span> },
+          { label: "FLEET DISTANCE",      value: `${parseFloat(s.totalFleetDistance || 0).toFixed(2)} km`, color: "from-[#3b758c] to-[#1797a6]", icon: <MapPin size={22} /> },
+          { label: "TODAY'S REVENUE",     value: `Rs.${(s.totalTodayRevenue || 0).toLocaleString()}`, color: "from-[#3b758c] to-[#1797a6]", icon: <TrendingUp size={22} /> },
+          { label: "TOTAL STOCK",         value: s.totalStock ?? 0,              color: "from-[#3b758c] to-[#1797a6]",  icon: <Package size={22} /> },
         ].map(k => (
           <div key={k.label} className={`bg-gradient-to-br ${k.color} text-white p-4 rounded-2xl shadow-lg`}>
             <div className="flex justify-between items-start mb-2">
@@ -854,7 +854,7 @@ function TabButton({ active, onClick, icon, label }) {
 
 function StatCard({ label, value, icon, color, subtitle }) {
   return (
-    <div className={`bg-gradient-to-br ${color} text-white p-6 rounded-2xl shadow-xl transform hover:scale-105 transition-all`}>
+    <div className="bg-gradient-to-br from-[#3b758c] to-[#1797a6] text-white p-6 rounded-2xl shadow-md transform hover:scale-105 transition-all">
       <div className="flex justify-between items-start mb-3">
         <p className="text-xs font-bold opacity-80 tracking-wider">{label}</p>
         <div className="bg-white bg-opacity-20 p-2 rounded-lg">

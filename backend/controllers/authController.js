@@ -5,10 +5,23 @@ import { User } from "../models/index.js"
 /* ================= SIGNUP ================= */
 export async function signup(req, res) {
     try {
-        const { name, phone, email, password, role } = req.body
+        const { name, phone, email, password, role, enterpriseName } = req.body
 
         if (!name || !phone || !email || !password) {
             return res.status(400).json({ error: "All fields are required" })
+        }
+
+        // Distributors must provide an enterprise name
+        const ROLE_MAP = {
+            "FIELD_OFFICER": "FIELD", "FIELD OFFICER": "FIELD",
+            "FIELDOFFICER": "FIELD", "FIELD": "FIELD",
+            "ADMIN": "ADMIN", "DISTRIBUTOR": "DISTRIBUTOR", "USER": "USER"
+        }
+        const rawRole = (role || "USER").toUpperCase().trim()
+        const normalizedRole = ROLE_MAP[rawRole] || "USER"
+
+        if (normalizedRole === "DISTRIBUTOR" && !enterpriseName?.trim()) {
+            return res.status(400).json({ error: "Enterprise name is required for distributors" })
         }
 
         const cleanPhone = phone.trim()
@@ -24,25 +37,13 @@ export async function signup(req, res) {
 
         const hashedPassword = await bcrypt.hash(password, 10)
 
-        // Normalize role: map any variant to the exact enum value in the schema
-        const ROLE_MAP = {
-            "FIELD_OFFICER": "FIELD",
-            "FIELD OFFICER": "FIELD",
-            "FIELDOFFICER": "FIELD",
-            "FIELD": "FIELD",
-            "ADMIN": "ADMIN",
-            "DISTRIBUTOR": "DISTRIBUTOR",
-            "USER": "USER"
-        }
-        const rawRole = (role || "USER").toUpperCase().trim()
-        const normalizedRole = ROLE_MAP[rawRole] || "USER"
-
         await User.create({
             name: name.trim(),
             phone: cleanPhone,
             email: cleanEmail,
             password: hashedPassword,
-            role: normalizedRole
+            role: normalizedRole,
+            ...(enterpriseName?.trim() && { enterpriseName: enterpriseName.trim() })
         })
 
         res.status(201).json({ message: "Signup successful" })
@@ -89,7 +90,7 @@ export async function login(req, res) {
         res.json({
             token,
             role: user.role,
-            user: { id: user._id, name: user.name, email: user.email, phone: user.phone }
+            user: { id: user._id, name: user.name, email: user.email, phone: user.phone, enterpriseName: user.enterpriseName || null }
         })
     } catch (err) {
         console.error("Login error details:", err)

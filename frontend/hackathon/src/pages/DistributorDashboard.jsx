@@ -1,4 +1,4 @@
-﻿import { useEffect, useState, useRef } from 'react'
+﻿﻿import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import occamyLogo from '../assets/occamylogo.jpg'
@@ -220,7 +220,6 @@ export default function DistributorDashboard() {
     { id:'home', label:'Dashboard' },
     { id:'inventory', label:'Inventory' },
     { id:'sales', label:'Sales' },
-    { id:'attendance', label:'Attendance' },
   ]
 
   return (
@@ -286,7 +285,8 @@ export default function DistributorDashboard() {
           ))}
         </div>
 
-        {/* ATTENDANCE BANNER */}
+        {/* ATTENDANCE BANNER — hidden for Distributor role */}
+        {false && (
         <div style={{ background: activeAttendance ? 'linear-gradient(135deg,'+C.green+' 0%,'+C.teal+' 100%)' : 'linear-gradient(135deg,#718096 0%,#4a5568 100%)', borderRadius:18, padding:'18px 22px', marginBottom:24, color:'#fff', display:'flex', flexWrap:'wrap', alignItems:'center', justifyContent:'space-between', gap:14 }}>
           <div style={{ display:'flex', alignItems:'center', gap:14 }}>
             <div style={{ background:'rgba(255,255,255,.2)', borderRadius:12, padding:10 }}><Navigation size={24} /></div>
@@ -314,32 +314,32 @@ export default function DistributorDashboard() {
             )}
           </div>
         </div>
+        )}
 
         {/* HOME TAB */}
         {activeTab === 'home' && (
           <>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))', gap:14, marginBottom:24 }}>
               {[
-                { label:'TODAY SALES', value: stats.sales, color: C.teal },
-                { label:'REVENUE', value: 'Rs.' + (stats.revenue || 0).toLocaleString(), color: C.green },
-                { label:'DISTANCE', value: fmtDist(stats.distanceTraveled) + ' km', color:'#8b5cf6' },
-                { label:'TOTAL STOCK', value: stats.totalStock, color:'#f59e0b' },
+                { label:'TODAY SALES', value: stats?.sales ?? 0 },
+                { label:'REVENUE', value: 'Rs.' + (stats?.revenue ?? 0).toLocaleString() },
+                { label:'TOTAL STOCK', value: stats?.totalStock ?? 0 },
               ].map(k => (
-                <div key={k.label} style={{ background:C.card, borderRadius:16, padding:'18px 16px', boxShadow:'0 4px 16px rgba(62,62,92,.08)', borderLeft:'4px solid '+k.color }}>
-                  <div style={{ fontSize:10, fontWeight:700, color:C.muted, letterSpacing:.5, marginBottom:8 }}>{k.label}</div>
-                  <div style={{ fontSize:22, fontWeight:900, color:C.navy }}>{k.value ?? '—'}</div>
+                <div key={k.label} style={{ background:'linear-gradient(135deg,#3b758c 0%,#1797a6 100%)', borderRadius:16, padding:'18px 16px', boxShadow:'0 6px 20px rgba(59,117,140,.25)', color:'#fff' }}>
+                  <div style={{ fontSize:10, fontWeight:700, opacity:.85, letterSpacing:.5, marginBottom:8 }}>{k.label}</div>
+                  <div style={{ fontSize:22, fontWeight:900 }}>{k.value ?? '—'}</div>
                 </div>
               ))}
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14, marginBottom:24 }}>
               <button onClick={() => { setActiveTab('inventory'); setShowInvForm(true) }}
-                style={{ background:'linear-gradient(135deg,'+C.teal+' 0%,'+C.navy+' 100%)', border:'none', borderRadius:16, padding:'18px 16px', cursor:'pointer', color:'#fff', display:'flex', flexDirection:'column', alignItems:'center', gap:8, fontFamily:'Poppins,sans-serif' }}>
+                style={{ background:'linear-gradient(135deg,#3b758c 0%,#1797a6 100%)', border:'none', borderRadius:16, padding:'18px 16px', cursor:'pointer', color:'#fff', display:'flex', flexDirection:'column', alignItems:'center', gap:8, fontFamily:'Poppins,sans-serif' }}>
                 <Warehouse size={28} />
                 <span style={{ fontWeight:700, fontSize:13 }}>Receive Stock</span>
                 <span style={{ fontSize:11, opacity:.8 }}>Record inward inventory</span>
               </button>
               <button onClick={() => { setActiveTab('sales'); setShowSaleForm(true) }}
-                style={{ background:'linear-gradient(135deg,'+C.green+' 0%,'+C.teal+' 100%)', border:'none', borderRadius:16, padding:'18px 16px', cursor:'pointer', color:'#fff', display:'flex', flexDirection:'column', alignItems:'center', gap:8, fontFamily:'Poppins,sans-serif' }}>
+                style={{ background:'linear-gradient(135deg,#3b758c 0%,#1797a6 100%)', border:'none', borderRadius:16, padding:'18px 16px', cursor:'pointer', color:'#fff', display:'flex', flexDirection:'column', alignItems:'center', gap:8, fontFamily:'Poppins,sans-serif' }}>
                 <TrendingUp size={28} />
                 <span style={{ fontWeight:700, fontSize:13 }}>Record Sale</span>
                 <span style={{ fontSize:11, opacity:.8 }}>B2B or B2C transaction</span>
@@ -529,8 +529,8 @@ export default function DistributorDashboard() {
           </>
         )}
 
-        {/* ATTENDANCE TAB */}
-        {activeTab === 'attendance' && (
+        {/* ATTENDANCE TAB — hidden for Distributor role (logic preserved) */}
+        {false && activeTab === 'attendance' && (
           <>
             <h2 style={{ fontSize:20, fontWeight:900, color:C.navy, marginBottom:16 }}>Attendance History</h2>
             <SectionCard title="Records (newest first)" onRefresh={loadAll}>
@@ -552,7 +552,7 @@ export default function DistributorDashboard() {
                         <span style={{ fontSize:12, color:C.muted }}>{fmtDate(a.startTime)}</span>
                       </div>
                       <div style={{ fontSize:13, color:C.navy }}>
-                        {fmtTime(a.startTime)} {a.endTime ? '→ ' + fmtTime(a.endTime) : '→ ongoing'}
+                        {fmtTime(a.startTime)} {a.endTime ? '-> ' + fmtTime(a.endTime) : '-> ongoing'}
                       </div>
                       <div style={{ fontSize:12, color:C.muted, marginTop:2 }}>Duration: {dH}h {dM}m</div>
                     </div>

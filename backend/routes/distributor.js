@@ -4,7 +4,7 @@ import {
     getDashboard, getSummary,
     startAttendance, endAttendance, trackLocation,
     logSale, getInventory, updateInventory,
-    getSalesHistory, getAttendanceHistory
+    getSalesHistory, getAttendanceHistory, getInventoryHistory
 } from "../controllers/distributorController.js"
 
 const router = express.Router()
@@ -21,5 +21,6 @@ router.get("/inventory",          auth, getInventory)
 router.post("/inventory",         auth, updateInventory)
 router.get("/sales",              auth, getSalesHistory)
 router.get("/attendance",         auth, getAttendanceHistory)
+router.get("/inventory/history",  auth, getInventoryHistory)
 
 export default router

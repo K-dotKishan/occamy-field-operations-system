@@ -16,7 +16,9 @@ export default function FieldMeetingOne() {
     state: "",
     estimatedVolume: 0,
     likelihood: "MEDIUM",
-    notes: ""
+    notes: "",
+    productSampleAvailable: false,
+    productSampleGiven: false
   })
   const [photos, setPhotos] = useState([])
   const [loading, setLoading] = useState(false)
@@ -58,6 +60,8 @@ export default function FieldMeetingOne() {
           }))
 
           formDataToSend.append('notes', formData.notes)
+          formDataToSend.append('productSampleAvailable', formData.productSampleAvailable)
+          formDataToSend.append('productSampleGiven', formData.productSampleGiven)
 
           photos.forEach(photo => {
             formDataToSend.append('photos', photo)
@@ -134,6 +138,12 @@ export default function FieldMeetingOne() {
                 <option value="SELLER">Seller</option>
                 <option value="INFLUENCER">Influencer</option>
                 <option value="VETERINARIAN">Veterinarian</option>
+                <option value="DAIRY_COLLECTION_CENTER">Dairy Collection Center</option>
+                <option value="RETAIL_OUTLET">Retail Outlet</option>
+                <option value="KVK">KVK</option>
+                <option value="FPO">FPO</option>
+                <option value="DISTRIBUTOR">Distributor</option>
+                <option value="DEALER">Dealer</option>
               </select>
             </div>
 
@@ -193,6 +203,31 @@ export default function FieldMeetingOne() {
                 <option value="MEDIUM">Medium</option>
                 <option value="HIGH">High</option>
               </select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Product Sample Available</label>
+                <select
+                  value={formData.productSampleAvailable ? "yes" : "no"}
+                  onChange={e => setFormData({...formData, productSampleAvailable: e.target.value === "yes"})}
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all"
+                >
+                  <option value="no">No</option>
+                  <option value="yes">Yes</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Product Sample Given</label>
+                <select
+                  value={formData.productSampleGiven ? "yes" : "no"}
+                  onChange={e => setFormData({...formData, productSampleGiven: e.target.value === "yes"})}
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all"
+                >
+                  <option value="no">No</option>
+                  <option value="yes">Yes</option>
+                </select>
+              </div>
             </div>
 
             <div>

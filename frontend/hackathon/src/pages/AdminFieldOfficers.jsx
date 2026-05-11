@@ -138,11 +138,11 @@ export default function AdminFieldOfficers() {
             {/* KPI STAT ROW */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14, marginBottom: 28 }}>
               {[
-                { label: "TOTAL FIELD OFFICERS", value: s.totalOfficers ?? 0,       grad: "linear-gradient(135deg,#3b82f6,#2563eb)",  icon: <Users size={22} /> },
-                { label: "ACTIVE NOW (GPS ON)",   value: s.activeNow ?? 0,           grad: "linear-gradient(135deg,#22c55e,#16a34a)",  icon: <Navigation size={22} /> },
-                { label: "MEETINGS TODAY",         value: s.totalMeetingsToday ?? 0,  grad: "linear-gradient(135deg,#a855f7,#9333ea)",  icon: <Calendar size={22} /> },
-                { label: "SAMPLES DISTRIBUTED",   value: s.totalSamplesToday ?? 0,   grad: "linear-gradient(135deg,#f97316,#ea580c)",  icon: <Package size={22} /> },
-                { label: "TOTAL DISTANCE",         value: fmtDist(s.totalFleetDistance) + " km", grad: "linear-gradient(135deg,#14b8a6,#0d9488)", icon: <MapPin size={22} /> },
+                { label: "TOTAL FIELD OFFICERS", value: s.totalOfficers ?? 0,       grad: "linear-gradient(135deg,#3b758c,#1797a6)",  icon: <Users size={22} /> },
+                { label: "ACTIVE NOW (GPS ON)",   value: s.activeNow ?? 0,           grad: "linear-gradient(135deg,#3b758c,#1797a6)",  icon: <Navigation size={22} /> },
+                { label: "MEETINGS TODAY",         value: s.totalMeetingsToday ?? 0,  grad: "linear-gradient(135deg,#3b758c,#1797a6)",  icon: <Calendar size={22} /> },
+                { label: "SAMPLES DISTRIBUTED",   value: s.totalSamplesToday ?? 0,   grad: "linear-gradient(135deg,#3b758c,#1797a6)",  icon: <Package size={22} /> },
+                { label: "TOTAL DISTANCE",         value: fmtDist(s.totalFleetDistance) + " km", grad: "linear-gradient(135deg,#3b758c,#1797a6)", icon: <MapPin size={22} /> },
               ].map(k => (
                 <div key={k.label} style={{ background: k.grad, borderRadius: 18, padding: "18px 16px", color: "#fff", boxShadow: "0 6px 20px rgba(0,0,0,.12)" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
@@ -353,28 +353,73 @@ export default function AdminFieldOfficers() {
                   <p style={{ fontSize: 13 }}>No meetings recorded yet</p>
                 </div>
               )}
-              {!meetLoading && meetings.map(m => (
-                <div key={m._id} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "12px 0", borderBottom: "1px solid #f3f4f6" }}>
-                  <div>
-                    <div style={{ fontWeight: 700, color: "#3E3E5C", fontSize: 14 }}>
-                      {m.type === "ONE_TO_ONE" ? (m.personName || "1:1 Meeting") : `Group Meeting — ${m.village || "Unknown"}`}
+              {!meetLoading && meetings.map(m => {
+                // Human-readable category label
+                const catLabel = {
+                  FARMER: "Farmer", SELLER: "Seller", INFLUENCER: "Influencer",
+                  VETERINARIAN: "Vet", DISTRIBUTOR: "Distributor", DEALER: "Dealer",
+                  DAIRY_COLLECTION_CENTER: "Dairy Center", RETAIL_OUTLET: "Retail Outlet",
+                  KVK: "KVK", FPO: "FPO"
+                }[m.category] || m.category || "—"
+
+                // Category badge colour
+                const catColor = {
+                  DAIRY_COLLECTION_CENTER: { bg: "#dbeafe", text: "#1d4ed8" },
+                  RETAIL_OUTLET:           { bg: "#fef3c7", text: "#92400e" },
+                  KVK:                     { bg: "#d1fae5", text: "#065f46" },
+                  FPO:                     { bg: "#ede9fe", text: "#5b21b6" },
+                  FARMER:                  { bg: "#dcfce7", text: "#166534" },
+                  VETERINARIAN:            { bg: "#fee2e2", text: "#991b1b" },
+                }[m.category] || { bg: "#f3f4f6", text: "#374151" }
+
+                return (
+                  <div key={m._id} style={{ padding: "12px 0", borderBottom: "1px solid #f3f4f6" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 700, color: "#3E3E5C", fontSize: 14 }}>
+                          {m.type === "ONE_TO_ONE" ? (m.personName || "1:1 Meeting") : `Group Meeting — ${m.village || "Unknown"}`}
+                        </div>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 4 }}>
+                          {/* Category badge */}
+                          <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: catColor.bg, color: catColor.text }}>
+                            {catLabel}
+                          </span>
+                          {/* Sample given badge */}
+                          {m.productSampleGiven && (
+                            <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: "#fef9c3", color: "#854d0e" }}>
+                              📦 Sample Given
+                            </span>
+                          )}
+                          {m.productSampleAvailable && !m.productSampleGiven && (
+                            <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: "#f0fdf4", color: "#166534" }}>
+                              ✅ Sample Available
+                            </span>
+                          )}
+                          {/* Meeting type badge */}
+                          <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: m.type === "ONE_TO_ONE" ? "#ede9fe" : "#dbeafe", color: m.type === "ONE_TO_ONE" ? "#7c3aed" : "#1d4ed8" }}>
+                            {m.type === "ONE_TO_ONE" ? "1:1" : "GROUP"}
+                          </span>
+                        </div>
+                        {m.type === "ONE_TO_ONE" && m.contactNumber && (
+                          <div style={{ fontSize: 11, color: "#7A7490", marginTop: 3 }}>{m.contactNumber}</div>
+                        )}
+                        {m.type === "GROUP" && (
+                          <div style={{ fontSize: 11, color: "#7A7490", marginTop: 3 }}>{m.attendeesCount || 0} attendees</div>
+                        )}
+                        {m.village && (
+                          <div style={{ fontSize: 11, color: "#9ca3af" }}>{m.village}{m.district ? `, ${m.district}` : ""}</div>
+                        )}
+                        <div style={{ fontSize: 11, color: "#9ca3af" }}>{new Date(m.createdAt).toLocaleString()}</div>
+                        {m.notes && (
+                          <div style={{ fontSize: 11, color: "#6b7280", fontStyle: "italic", marginTop: 2 }}>
+                            "{m.notes.slice(0, 100)}{m.notes.length > 100 ? "…" : ""}"
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <div style={{ fontSize: 12, color: "#7A7490" }}>
-                      {m.type === "ONE_TO_ONE"
-                        ? `${m.category || "FARMER"} • ${m.contactNumber || ""}`
-                        : `${m.attendeesCount || 0} attendees`}
-                    </div>
-                    {m.village && m.type === "ONE_TO_ONE" && (
-                      <div style={{ fontSize: 11, color: "#9ca3af" }}>{m.village}{m.district ? `, ${m.district}` : ""}</div>
-                    )}
-                    <div style={{ fontSize: 11, color: "#9ca3af" }}>{new Date(m.createdAt).toLocaleString()}</div>
-                    {m.notes && <div style={{ fontSize: 11, color: "#6b7280", fontStyle: "italic", marginTop: 2 }}>"{m.notes.slice(0, 100)}{m.notes.length > 100 ? "…" : ""}"</div>}
                   </div>
-                  <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: m.type === "ONE_TO_ONE" ? "#ede9fe" : "#dbeafe", color: m.type === "ONE_TO_ONE" ? "#7c3aed" : "#1d4ed8", flexShrink: 0, marginLeft: 12 }}>
-                    {m.type === "ONE_TO_ONE" ? "1:1" : "GROUP"}
-                  </span>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         </div>

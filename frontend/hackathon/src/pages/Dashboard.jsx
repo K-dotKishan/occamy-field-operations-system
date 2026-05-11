@@ -173,17 +173,33 @@ export default function Dashboard() {
     if (role !== "FIELD") return
     if (!navigator.geolocation) return
 
-    // This watcher is intentionally separate from startLiveTracking — it keeps
-    // the LocationTrack path updated even when the main tracking watcher isn't running.
-    // Use high accuracy + no caching so every real movement is captured.
+    // Track last-sent position so we only call the API when the officer
+    // has moved at least 10 metres -- reduces server load on slow networks.
+    let lastSentLat = null
+    let lastSentLng = null
+    const MIN_MOVE_KM = 0.010 // 10 metres
+
     const watchId = navigator.geolocation.watchPosition(
       async (pos) => {
+        const { latitude: lat, longitude: lng, accuracy } = pos.coords
+
+        // Throttle: skip if we haven't moved 10 m since last API call
+        if (lastSentLat !== null && lastSentLng !== null) {
+          // Inline haversine -- no external dependency needed
+          const R = 6371000
+          const dLat = (lat - lastSentLat) * Math.PI / 180
+          const dLon = (lng - lastSentLng) * Math.PI / 180
+          const a = Math.sin(dLat/2)**2 + Math.cos(lastSentLat * Math.PI/180) * Math.cos(lat * Math.PI/180) * Math.sin(dLon/2)**2
+          const distM = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+          if (distM < 10) return // less than 10 m -- skip
+        }
+
+        lastSentLat = lat
+        lastSentLng = lng
+
         try {
           await api("/field/location/track", "POST", {
-            lat: pos.coords.latitude,
-            lng: pos.coords.longitude,
-            accuracy: pos.coords.accuracy,
-            activity: "TRAVEL"
+            lat, lng, accuracy, activity: "TRAVEL"
           })
         } catch (err) {
           console.log("GPS send failed")
@@ -192,7 +208,7 @@ export default function Dashboard() {
       (err) => console.log("GPS background error:", err.message),
       {
         enableHighAccuracy: true,
-        maximumAge: 0,        // never use a cached position
+        maximumAge: 0,
         timeout: 30000
       }
     )
@@ -336,7 +352,7 @@ export default function Dashboard() {
           setTimeout(() => startLiveTracking(false), 500)
         }
       } else {
-        // No active session on server — clear any stale localStorage entry
+        // No active session on server -- clear any stale localStorage entry
         localStorage.removeItem("activeAttendance")
         setActiveAttendance(null)
       }
@@ -581,7 +597,7 @@ export default function Dashboard() {
     // Distance verification: warn if no distance was recorded
     const currentDistance = fieldStats?.distanceTraveled || 0
     if (currentDistance === 0 && isTracking) {
-      showNotification("warning", "No distance recorded yet. GPS tracking is active — please wait a moment and try again.")
+      showNotification("warning", "No distance recorded yet. GPS tracking is active -- please wait a moment and try again.")
       return
     }
 
@@ -601,7 +617,7 @@ export default function Dashboard() {
         lng: position.coords.longitude
       }
 
-      // End attendance — backend will validate time-gate and capture final distance
+      // End attendance -- backend will validate time-gate and capture final distance
       const result = await api("/field/attendance/end", "POST", {
         location: coords,
         timestamp: new Date().toISOString()
@@ -668,10 +684,10 @@ export default function Dashboard() {
       } text-white px-6 py-4 rounded-2xl shadow-lg flex items-center gap-3 transform hover:scale-105 transition-transform duration-300`
 
     notification.innerHTML = `
-      ${type === 'success' ? '<div class="animate-bounce">🎉</div>' :
-        type === 'error' ? '<div class="animate-pulse">⚠️</div>' :
-          type === 'warning' ? '<div class="animate-pulse">🔔</div>' :
-            '<div class="animate-pulse">ℹ️</div>'}
+      ${type === 'success' ? '<div class="animate-bounce"></div>' :
+        type === 'error' ? '<div class="animate-pulse">(!)</div>' :
+          type === 'warning' ? '<div class="animate-pulse">(!)</div>' :
+            '<div class="animate-pulse">(i)</div>'}
       <div>
         <p class="font-bold text-sm">${type === 'success' ? 'Success!' : type === 'error' ? 'Error!' : type === 'warning' ? 'Warning!' : 'Info!'}</p>
         <p class="text-xs opacity-90">${message}</p>
@@ -1137,10 +1153,10 @@ export default function Dashboard() {
                         label="USERS"
                         value={adminData?.stats?.totalUsers || 6}
                         icon={<Users size={20} />}
-                        color="from-blue-500 to-cyan-600"
+                        color="from-[#3b758c] to-[#1797a6]"
                       />
 
-                      {/* FIELD TRACKING — stays on main page, scrolls to live map */}
+                      {/* FIELD TRACKING -- stays on main page, scrolls to live map */}
                       <div
                         onClick={() => {
                           const el = document.getElementById("map-section")
@@ -1153,13 +1169,13 @@ export default function Dashboard() {
                           label="FIELD TRACKING"
                           value={`${Object.values(typeof liveUsers === 'object' ? liveUsers : {}).filter(u => u.status === 'active').length}/${adminData?.users?.filter(u => u.role === 'FIELD').length || 0} active`}
                           icon={<Map size={20} />}
-                          color="from-blue-500 to-cyan-600"
+                          color="from-[#3b758c] to-[#1797a6]"
                           delay={100}
                           live={true}
                         />
                       </div>
 
-                      {/* FIELD OFFICERS — navigates to dedicated Field Officer Control Center */}
+                      {/* FIELD OFFICERS -- navigates to dedicated Field Officer Control Center */}
                       <div
                         onClick={() => navigate('/admin/field-officers')}
                         className="cursor-pointer transition-transform hover:scale-105"
@@ -1168,7 +1184,7 @@ export default function Dashboard() {
                           label="FIELD OFFICERS"
                           value={adminData?.users?.filter(u => u.role === 'FIELD').length || 0}
                           icon={<Users size={20} />}
-                          color="from-blue-500 to-indigo-600"
+                          color="from-[#3b758c] to-[#1797a6]"
                           delay={200}
                         />
                       </div>
@@ -1180,14 +1196,14 @@ export default function Dashboard() {
                       >
                         <StatCard
                           label="REVENUE"
-                          value={`₹${(adminData?.stats?.totalRevenue || 0).toLocaleString()}`}
+                          value={`Rs.${(adminData?.stats?.totalRevenue || 0).toLocaleString()}`}
                           icon={<DollarSign size={20} />}
-                          color="from-blue-600 to-blue-800"
+                          color="from-[#3b758c] to-[#1797a6]"
                           delay={400}
                         />
                       </div>
 
-                      {/* DISTRIBUTORS — navigates to Distributor Control Center */}
+                      {/* DISTRIBUTORS -- navigates to Distributor Control Center */}
                       <div
                         onClick={() => navigate('/admin/distributors')}
                         className="cursor-pointer transition-transform hover:scale-105"
@@ -1196,7 +1212,7 @@ export default function Dashboard() {
                           label="DISTRIBUTORS"
                           value={adminData?.users?.filter(u => u.role === 'DISTRIBUTOR').length || 0}
                           icon={<Users size={20} />}
-                          color="from-indigo-500 to-purple-600"
+                          color="from-[#3b758c] to-[#1797a6]"
                           delay={500}
                         />
                       </div>
@@ -1356,18 +1372,18 @@ export default function Dashboard() {
                                 <div className="space-y-2 text-sm">
                                   <div className="flex items-center gap-2">
                                     <MapPin size={12} className="text-gray-500" />
-                                    <span>📍 {user.lat.toFixed(4)}, {user.lng.toFixed(4)}</span>
+                                    <span> {user.lat.toFixed(4)}, {user.lng.toFixed(4)}</span>
                                   </div>
 
                                   <div className="flex items-center gap-2">
                                     <TrendingUp size={12} className="text-gray-500" />
-                                    <span>📏 {(user.distanceTravelled || user.totalDistance || 0).toFixed(2)} km</span>
+                                    <span> {(user.distanceTravelled || user.totalDistance || 0).toFixed(2)} km</span>
                                   </div>
 
                                   {user.speed && (
                                     <div className="flex items-center gap-2">
                                       <Navigation size={12} className="text-gray-500" />
-                                      <span>🚀 Speed: {(user.speed * 3.6).toFixed(1)} km/h</span>
+                                      <span> Speed: {(user.speed * 3.6).toFixed(1)} km/h</span>
                                     </div>
                                   )}
 
@@ -1376,7 +1392,7 @@ export default function Dashboard() {
                                       <div className={`w-2 h-2 rounded-full ${user.battery > 50 ? 'bg-green-500' :
                                         user.battery > 20 ? 'bg-yellow-500' : 'bg-red-500'
                                         }`}></div>
-                                      <span>🔋 Battery: {user.battery}%</span>
+                                      <span> Battery: {user.battery}%</span>
                                     </div>
                                   )}
 
@@ -1518,7 +1534,7 @@ export default function Dashboard() {
                                     </span>
                                     {user.battery && (
                                       <span className="text-xs text-gray-500 flex items-center gap-1">
-                                        🔋 {user.battery}%
+                                         {user.battery}%
                                       </span>
                                     )}
                                   </div>
@@ -1528,8 +1544,8 @@ export default function Dashboard() {
                             </div>
 
                             <div className="mt-2 text-xs text-gray-600">
-                              <p className="truncate">📍 {user.lat.toFixed(4)}, {user.lng.toFixed(4)}</p>
-                              <p className="truncate mt-1">📏 Distance: {(user.distanceTravelled || user.totalDistance || 0).toFixed(2)} km</p>
+                              <p className="truncate"> {user.lat.toFixed(4)}, {user.lng.toFixed(4)}</p>
+                              <p className="truncate mt-1"> Distance: {(user.distanceTravelled || user.totalDistance || 0).toFixed(2)} km</p>
                               <p className="text-gray-500 mt-1">
                                 Last seen: {new Date(user.lastUpdate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                               </p>
@@ -1669,7 +1685,6 @@ export default function Dashboard() {
           <>
             <h2 className="text-2xl sm:text-4xl font-black mb-6 text-gray-800 animate-fadeIn">
               Field Officer Dashboard
-              <span className="ml-3 inline-block">🚜</span>
             </h2>
 
             {/* Live Tracking Status */}
@@ -1720,14 +1735,14 @@ export default function Dashboard() {
                 label="SALES"
                 value={fieldStats?.sales || 0}
                 icon={<TrendingUp size={20} />}
-                color="from-emerald-500 to-teal-600"
+                color="from-[#3b758c] to-[#1797a6]"
                 delay={200}
               />
               <StatCard
                 label="DISTANCE"
                 value={`${(fieldStats?.distanceTraveled || 0).toFixed(2)} km`}
                 icon={<Navigation size={20} />}
-                color="from-orange-500 to-amber-600"
+                color="from-[#3b758c] to-[#1797a6]"
                 delay={300}
               />
             </div>
@@ -1739,7 +1754,7 @@ export default function Dashboard() {
                   icon={<MapPin size={20} />}
                   label="Start Day"
                   subtitle="Mark attendance"
-                  color="from-blue-500 to-cyan-600"
+                  color="from-[#3b758c] to-[#1797a6]"
                   onClick={startDay}
                   delay={0}
                 />
@@ -1759,7 +1774,7 @@ export default function Dashboard() {
                 icon={<Users size={20} />}
                 label="One-to-One"
                 subtitle="Individual meeting"
-                color="from-blue-500 to-cyan-600"
+                color="from-[#3b758c] to-[#1797a6]"
                 onClick={() => openMeetingForm("ONE_TO_ONE")}
                 delay={150}
               />
@@ -1767,7 +1782,7 @@ export default function Dashboard() {
                 icon={<Users size={20} className="rotate-12" />}
                 label="Group"
                 subtitle="Group session"
-                color="from-blue-500 to-cyan-600"
+                color="from-[#3b758c] to-[#1797a6]"
                 onClick={() => openMeetingForm("GROUP")}
                 delay={300}
               />
@@ -1775,7 +1790,7 @@ export default function Dashboard() {
                 icon={<TrendingUp size={20} />}
                 label="Record Sale"
                 subtitle="New transaction"
-                color="from-blue-500 to-cyan-600"
+                color="from-[#3b758c] to-[#1797a6]"
                 onClick={() => setShowSaleForm(true)}
                 delay={450}
               />
@@ -1814,7 +1829,7 @@ export default function Dashboard() {
                   <div className="mb-4">
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-sm text-blue-900 font-medium">Location Accuracy</span>
-                      <span className="text-sm font-bold text-blue-700">±{location.accuracy?.toFixed(1)} meters</span>
+                      <span className="text-sm font-bold text-blue-700">+/-{location.accuracy?.toFixed(1)} meters</span>
                     </div>
                     <div className="w-full bg-blue-200 rounded-full h-2">
                       <div
@@ -1856,7 +1871,7 @@ export default function Dashboard() {
                       <Popup>
                         <div className="p-2">
                           <p className="font-bold">Your Current Location</p>
-                          <p className="text-sm">Accuracy: ±{location.accuracy?.toFixed(1)}m</p>
+                          <p className="text-sm">Accuracy: +/-{location.accuracy?.toFixed(1)}m</p>
                           {location.speed && (
                             <p className="text-sm">Speed: {(location.speed * 3.6).toFixed(1)} km/h</p>
                           )}
@@ -1907,7 +1922,7 @@ export default function Dashboard() {
                   <div className="relative">
                     <h2 className="text-2xl sm:text-4xl font-black text-gray-800 mb-1 animate-fadeIn">
                       Product Marketplace
-                      <span className="ml-3 inline-block">🛒</span>
+                      <span className="ml-3 inline-block"></span>
                     </h2>
                     <p className="text-sm text-gray-600 animate-slideInLeft animation-delay-100">
                       Browse and order premium agricultural products
@@ -2179,7 +2194,7 @@ function StatCard({ label, value, icon, color, delay = 0, live = false }) {
           {icon}
         </div>
       </div>
-      <p className="text-xl sm:text-2xl font-black truncate">{value ?? "—"}</p>
+      <p className="text-xl sm:text-2xl font-black truncate">{value ?? "--"}</p>
       <div className="h-1 w-0 group-hover:w-full bg-white bg-opacity-30 transition-all duration-500 mt-2 rounded-full"></div>
     </div>
   )
@@ -2248,7 +2263,7 @@ function ProductCard({ product, onOrder, delay = 0 }) {
           <div className="flex justify-between items-center mb-3">
             <div>
               <p className="text-lg font-black bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
-                ₹{product.price}
+                Rs.{product.price}
               </p>
               <p className="text-xs text-gray-500">per {product.unit}</p>
             </div>
@@ -2285,11 +2300,11 @@ function OrderItem({ order, delay = 0 }) {
   }
 
   const statusIcons = {
-    PENDING: '⏳',
-    CONFIRMED: '✅',
-    SHIPPED: '🚚',
-    DELIVERED: '📦',
-    CANCELLED: '❌'
+    PENDING: '...',
+    CONFIRMED: '[OK]',
+    SHIPPED: '',
+    DELIVERED: '',
+    CANCELLED: '[X]'
   }
 
   return (
@@ -2301,7 +2316,7 @@ function OrderItem({ order, delay = 0 }) {
         <div className="flex-1 min-w-0">
           <p className="font-bold text-gray-800 text-sm truncate">{order.productName}</p>
           <p className="text-xs text-gray-600 mt-1">
-            Qty: {order.quantity} × ₹{order.price}
+            Qty: {order.quantity} x Rs.{order.price}
           </p>
           <p className="text-xs text-gray-400 mt-1">{new Date(order.createdAt).toLocaleDateString()}</p>
         </div>
@@ -2309,7 +2324,7 @@ function OrderItem({ order, delay = 0 }) {
           <span className={`px-3 py-1.5 rounded-full text-xs font-bold ${statusColors[order.status]} shadow-sm`}>
             {statusIcons[order.status]} {order.status}
           </span>
-          <p className="text-sm font-bold text-gray-800">₹{order.quantity * order.price}</p>
+          <p className="text-sm font-bold text-gray-800">Rs.{order.quantity * order.price}</p>
         </div>
       </div>
     </div>
@@ -2450,7 +2465,7 @@ function EnhancedOrderModal({ product, onClose, onSuccess }) {
                 </div>
                 <div className="flex justify-between items-center relative z-10">
                   <div>
-                    <span className="text-2xl font-black text-blue-700">₹{product.price}</span>
+                    <span className="text-2xl font-black text-blue-700">Rs.{product.price}</span>
                     <span className="text-sm text-gray-600">/{product.unit}</span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -2578,8 +2593,8 @@ function EnhancedOrderModal({ product, onClose, onSuccess }) {
               <div className="bg-gradient-to-r from-gray-50 to-gray-100 p-4 sm:p-6 rounded-xl mb-6">
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-700">Price ({quantity} × ₹{product.price})</span>
-                    <span className="font-bold">₹{product.price * quantity}</span>
+                    <span className="text-gray-700">Price ({quantity} x Rs.{product.price})</span>
+                    <span className="font-bold">Rs.{product.price * quantity}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-700">Delivery Charges</span>
@@ -2589,7 +2604,7 @@ function EnhancedOrderModal({ product, onClose, onSuccess }) {
                     <div className="flex justify-between items-center">
                       <span className="text-lg font-bold text-gray-800">Total Amount:</span>
                       <span className="text-2xl font-black bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
-                        ₹{total.toLocaleString()}
+                        Rs.{total.toLocaleString()}
                       </span>
                     </div>
                   </div>
@@ -2599,7 +2614,7 @@ function EnhancedOrderModal({ product, onClose, onSuccess }) {
               {/* Security Badge */}
               <div className="flex items-center justify-center gap-2 mb-6 text-sm text-gray-600">
                 <Shield size={16} className="text-blue-600" />
-                <span>Secure transaction • 100% Safe Payment</span>
+                <span>Secure transaction * 100% Safe Payment</span>
               </div>
 
               {/* Error Message */}
@@ -2684,8 +2699,8 @@ function EnhancedMeetingRow({ meeting, delay = 0 }) {
   }
 
   const typeIcons = {
-    'ONE_TO_ONE': '👤',
-    'GROUP': '👥'
+    'ONE_TO_ONE': '',
+    'GROUP': ''
   }
 
   return (
@@ -2708,7 +2723,7 @@ function EnhancedMeetingRow({ meeting, delay = 0 }) {
         {meeting.village && (
           <p className="text-xs text-gray-500 mb-1 truncate flex items-center gap-1">
             <MapPin size={10} />
-            {meeting.village} • {meeting.attendeesCount} attendees
+            {meeting.village} * {meeting.attendeesCount} attendees
           </p>
         )}
         <div className="flex justify-between items-center">
@@ -2744,7 +2759,7 @@ function EnhancedAttendanceRow({ attendance, delay = 0 }) {
             {attendance.userId?.name || "Field Officer"}
           </p>
           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
-            {isActive ? '🟢 Active' : '✅ Completed'}
+            {isActive ? '[ON] Active' : '[OK] Completed'}
           </span>
         </div>
         <p className="text-xs text-gray-500 truncate mb-2">{attendance.userId?.email}</p>
@@ -2754,22 +2769,22 @@ function EnhancedAttendanceRow({ attendance, delay = 0 }) {
             {new Date(attendance.startTime).toLocaleDateString()}
           </span>
           <span className="flex items-center gap-1">
-            🕐 {new Date(attendance.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+             {new Date(attendance.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </span>
           {attendance.endTime ? (
             <span className="flex items-center gap-1">
-              → {new Date(attendance.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              -> {new Date(attendance.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </span>
           ) : (
-            <span className="text-green-600 font-semibold">→ ongoing</span>
+            <span className="text-green-600 font-semibold">-> ongoing</span>
           )}
           <span className="flex items-center gap-1 font-semibold text-blue-600">
-            ⏱ {durationH}h {durationM}m
+            ^ {durationH}h {durationM}m
           </span>
         </div>
         <div className="flex flex-wrap gap-2 mt-1 text-xs">
           <span className="flex items-center gap-1 text-orange-600 font-semibold">
-            📏 {parseFloat(attendance.totalDistance || 0).toFixed(2)} km
+             {parseFloat(attendance.totalDistance || 0).toFixed(2)} km
           </span>
           {attendance.startLocation?.lat && (
             <span className="flex items-center gap-1 text-gray-400">
@@ -2822,6 +2837,8 @@ function EnhancedFieldMeetingOne({ onClose }) {
   const [followerCount, setFollowerCount] = useState("")
   const [agencyName, setAgencyName] = useState("")
   const [territory, setTerritory] = useState("")
+  const [productSampleAvailable, setProductSampleAvailable] = useState(false)
+  const [productSampleGiven, setProductSampleGiven] = useState(false)
 
   const handlePhotoChange = (e) => {
     const file = e.target.files[0]
@@ -2906,6 +2923,9 @@ function EnhancedFieldMeetingOne({ onClose }) {
         followerCount: category === "INFLUENCER" ? followerCount : undefined,
         agencyName: category === "DISTRIBUTOR" ? agencyName : undefined,
         territory: category === "DISTRIBUTOR" ? territory : undefined,
+        // Sample tracking — available for all categories
+        productSampleAvailable,
+        productSampleGiven,
       }
 
       await api("/field/meeting", "POST", meetingData)
@@ -2955,6 +2975,10 @@ function EnhancedFieldMeetingOne({ onClose }) {
             <option value="DISTRIBUTOR">Distributor</option>
             <option value="DEALER">Dealer</option>
             <option value="VETERINARIAN">Veterinarian</option>
+            <option value="DAIRY_COLLECTION_CENTER">Dairy Collection Center</option>
+            <option value="RETAIL_OUTLET">Retail Outlet</option>
+            <option value="KVK">KVK</option>
+            <option value="FPO">FPO</option>
           </select>
         </div>
 
@@ -2993,24 +3017,54 @@ function EnhancedFieldMeetingOne({ onClose }) {
         {category === "FARMER" && (
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">Land Size (Acres)</label>
-              <input
-                type="text"
-                value={landSize}
-                onChange={e => setLandSize(e.target.value)}
-                placeholder="e.g. 5"
+              <label className="block text-sm font-bold text-gray-700 mb-2">Product Sample Available</label>
+              <select
+                value={productSampleAvailable ? "yes" : "no"}
+                onChange={e => setProductSampleAvailable(e.target.value === "yes")}
                 className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all"
-              />
+              >
+                <option value="no">No</option>
+                <option value="yes">Yes</option>
+              </select>
             </div>
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">Main Crop</label>
-              <input
-                type="text"
-                value={cropType}
-                onChange={e => setCropType(e.target.value)}
-                placeholder="e.g. Wheat"
+              <label className="block text-sm font-bold text-gray-700 mb-2">Product Sample Given</label>
+              <select
+                value={productSampleGiven ? "yes" : "no"}
+                onChange={e => setProductSampleGiven(e.target.value === "yes")}
                 className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all"
-              />
+              >
+                <option value="no">No</option>
+                <option value="yes">Yes</option>
+              </select>
+            </div>
+          </div>
+        )}
+
+        {/* Product Sample fields for new categories */}
+        {["DAIRY_COLLECTION_CENTER", "RETAIL_OUTLET", "KVK", "FPO", "VETERINARIAN"].includes(category) && (
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">Product Sample Available</label>
+              <select
+                value={productSampleAvailable ? "yes" : "no"}
+                onChange={e => setProductSampleAvailable(e.target.value === "yes")}
+                className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all"
+              >
+                <option value="no">No</option>
+                <option value="yes">Yes</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">Product Sample Given</label>
+              <select
+                value={productSampleGiven ? "yes" : "no"}
+                onChange={e => setProductSampleGiven(e.target.value === "yes")}
+                className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all"
+              >
+                <option value="no">No</option>
+                <option value="yes">Yes</option>
+              </select>
             </div>
           </div>
         )}
@@ -3091,7 +3145,7 @@ function EnhancedFieldMeetingOne({ onClose }) {
         )}
 
         <div>
-          <label className="block text-sm font-bold text-gray-700 mb-2">Meeting Photo (Optional)</label>
+          <label className="block text-sm font-bold text-gray-700 mb-2">Meeting Photo</label>
           <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 transition-all hover:border-indigo-500 focus-within:border-indigo-500">
             <div className="flex flex-col items-center justify-center gap-3">
               {photoPreview ? (
@@ -3172,35 +3226,41 @@ function EnhancedFieldMeetingGroup({ onClose }) {
   const [count, setCount] = useState(0)
   const [category, setCategory] = useState("FARMER")
   const [topic, setTopic] = useState("")
+  const [entityName, setEntityName] = useState("")
+  const [productSampleAvailable, setProductSampleAvailable] = useState(false)
+  const [productSampleGiven, setProductSampleGiven] = useState(false)
   const [loading, setLoading] = useState(false)
   const [photo, setPhoto] = useState(null)
   const [photoPreview, setPhotoPreview] = useState(null)
+
+  // Categories that require an Entity Name field
+  const ENTITY_CATEGORIES = ["DAIRY_COLLECTION_CENTER", "RETAIL_OUTLET", "KVK", "FPO"]
+  const entityPlaceholder = {
+    DAIRY_COLLECTION_CENTER: "Enter Dairy Collection Center Name",
+    RETAIL_OUTLET: "Enter Retail Outlet Name",
+    KVK: "Enter KVK Name",
+    FPO: "Enter FPO Name"
+  }[category] || "Enter Entity Name"
 
   const handlePhotoChange = (e) => {
     const file = e.target.files[0]
     if (file) {
       setPhoto(file)
-      // Create preview
       const reader = new FileReader()
-      reader.onloadend = () => {
-        setPhotoPreview(reader.result)
-      }
+      reader.onloadend = () => { setPhotoPreview(reader.result) }
       reader.readAsDataURL(file)
     }
   }
 
   const uploadPhoto = async () => {
     if (!photo) return ""
-
     try {
       const formData = new FormData()
       formData.append("photo", photo)
-
       const res = await fetch(`${API_URL}/field/upload-photo`, {
         method: "POST",
         body: formData
       })
-
       const data = await res.json()
       return data.photoUrl || ""
     } catch (error) {
@@ -3214,19 +3274,16 @@ function EnhancedFieldMeetingGroup({ onClose }) {
       showNotification("error", "Please enter village name")
       return
     }
-
     if (count === 0) {
       showNotification("error", "Please enter number of attendees")
       return
     }
-
     if (!navigator.geolocation) {
       showNotification("error", "Geolocation not supported")
       return
     }
 
     setLoading(true)
-
     try {
       const position = await new Promise((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(resolve, reject, {
@@ -3235,11 +3292,8 @@ function EnhancedFieldMeetingGroup({ onClose }) {
         })
       })
 
-      // Upload photo if exists
       let photoUrl = ""
-      if (photo) {
-        photoUrl = await uploadPhoto()
-      }
+      if (photo) { photoUrl = await uploadPhoto() }
 
       const meetingData = {
         type: "GROUP",
@@ -3247,23 +3301,25 @@ function EnhancedFieldMeetingGroup({ onClose }) {
         village: village.trim(),
         attendeesCount: count,
         topic: topic.trim() || undefined,
+        // Entity name for institutional categories
+        entityName: ENTITY_CATEGORIES.includes(category) ? (entityName.trim() || undefined) : undefined,
         location: {
           lat: position.coords.latitude,
           lng: position.coords.longitude,
           accuracy: position.coords.accuracy
         },
         photoUrl: photoUrl || undefined,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        productSampleAvailable,
+        productSampleGiven,
       }
 
       await api("/field/meeting", "POST", meetingData)
 
       showNotification("success", "Group meeting logged successfully!")
-      setVillage("")
-      setCount(0)
-      setTopic("")
-      setPhoto(null)
-      setPhotoPreview(null)
+      setVillage(""); setCount(0); setTopic(""); setEntityName("")
+      setProductSampleAvailable(false); setProductSampleGiven(false)
+      setPhoto(null); setPhotoPreview(null)
       setLoading(false)
       onClose()
     } catch (error) {
@@ -3279,31 +3335,51 @@ function EnhancedFieldMeetingGroup({ onClose }) {
       <div className="flex justify-between items-center mb-6">
         <div>
           <h2 className="text-xl sm:text-2xl font-black text-gray-800">Group Meeting</h2>
-          <p className="text-sm text-gray-600 mt-1">Log group sessions with multiple farmers</p>
+          <p className="text-sm text-gray-600 mt-1">Log group sessions with multiple participants</p>
         </div>
-        <button
-          onClick={onClose}
-          className="text-gray-400 hover:text-gray-600 transition-colors p-2 hover:bg-gray-100 rounded-full"
-        >
+        <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors p-2 hover:bg-gray-100 rounded-full">
           <X size={24} />
         </button>
       </div>
 
       <div className="space-y-4 sm:space-y-5">
+
+        {/* Category */}
         <div>
           <label className="block text-sm font-bold text-gray-700 mb-2">Category</label>
           <select
             value={category}
-            onChange={e => setCategory(e.target.value)}
+            onChange={e => { setCategory(e.target.value); setEntityName("") }}
             className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200 outline-none transition-all"
           >
             <option value="FARMER">Farmers</option>
             <option value="SELLER">Sellers</option>
             <option value="INFLUENCER">Influencers</option>
             <option value="DISTRIBUTOR">Distributors</option>
+            <option value="VETERINARIAN">Veterinarians</option>
+            <option value="DAIRY_COLLECTION_CENTER">Dairy Collection Center</option>
+            <option value="RETAIL_OUTLET">Retail Outlet</option>
+            <option value="KVK">KVK</option>
+            <option value="FPO">FPO</option>
           </select>
         </div>
 
+        {/* Entity Name — shown for institutional categories */}
+        {ENTITY_CATEGORIES.includes(category) && (
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-2">
+              Entity Name <span className="text-red-500">*</span>
+            </label>
+            <input
+              placeholder={entityPlaceholder}
+              className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200 outline-none transition-all"
+              value={entityName}
+              onChange={e => setEntityName(e.target.value)}
+            />
+          </div>
+        )}
+
+        {/* Village */}
         <div>
           <label className="block text-sm font-bold text-gray-700 mb-2">
             Village Name <span className="text-red-500">*</span>
@@ -3316,6 +3392,7 @@ function EnhancedFieldMeetingGroup({ onClose }) {
           />
         </div>
 
+        {/* Topic */}
         <div>
           <label className="block text-sm font-bold text-gray-700 mb-2">Meeting Topic</label>
           <input
@@ -3326,6 +3403,7 @@ function EnhancedFieldMeetingGroup({ onClose }) {
           />
         </div>
 
+        {/* Attendees */}
         <div>
           <label className="block text-sm font-bold text-gray-700 mb-2">
             Number of Attendees <span className="text-red-500">*</span>
@@ -3339,22 +3417,42 @@ function EnhancedFieldMeetingGroup({ onClose }) {
           />
         </div>
 
+        {/* Product Sample fields */}
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-2">Product Sample Available</label>
+            <select
+              value={productSampleAvailable ? "yes" : "no"}
+              onChange={e => setProductSampleAvailable(e.target.value === "yes")}
+              className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200 outline-none transition-all"
+            >
+              <option value="no">No</option>
+              <option value="yes">Yes</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-2">Product Sample Given</label>
+            <select
+              value={productSampleGiven ? "yes" : "no"}
+              onChange={e => setProductSampleGiven(e.target.value === "yes")}
+              className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200 outline-none transition-all"
+            >
+              <option value="no">No</option>
+              <option value="yes">Yes</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Photo upload */}
         <div>
-          <label className="block text-sm font-bold text-gray-700 mb-2">Meeting Photo (Optional)</label>
+          <label className="block text-sm font-bold text-gray-700 mb-2">Meeting Photo</label>
           <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 transition-all hover:border-purple-500 focus-within:border-purple-500">
             <div className="flex flex-col items-center justify-center gap-3">
               {photoPreview ? (
                 <div className="relative w-full">
-                  <img
-                    src={photoPreview}
-                    alt="Preview"
-                    className="w-full h-48 object-cover rounded-lg"
-                  />
+                  <img src={photoPreview} alt="Preview" className="w-full h-48 object-cover rounded-lg" />
                   <button
-                    onClick={() => {
-                      setPhoto(null)
-                      setPhotoPreview(null)
-                    }}
+                    onClick={() => { setPhoto(null); setPhotoPreview(null) }}
                     className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full hover:bg-red-600 transition-colors"
                   >
                     <X size={16} />
@@ -3373,12 +3471,7 @@ function EnhancedFieldMeetingGroup({ onClose }) {
                 <div className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-lg font-bold text-sm hover:from-purple-600 hover:to-pink-700 transition-all">
                   {photoPreview ? 'Change Photo' : 'Choose Photo'}
                 </div>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handlePhotoChange}
-                  className="hidden"
-                />
+                <input type="file" accept="image/*" onChange={handlePhotoChange} className="hidden" />
               </label>
             </div>
           </div>
@@ -3668,7 +3761,7 @@ function EnhancedSaleForm({ onClose }) {
           <div>
             <label className="block text-sm font-bold text-gray-700 mb-2">Total Amount</label>
             <div className="px-3 sm:px-4 py-2 sm:py-3 bg-blue-50 border-2 border-blue-300 rounded-lg sm:rounded-xl">
-              <p className="text-lg sm:text-2xl font-black text-blue-700">₹{totalAmount.toLocaleString()}</p>
+              <p className="text-lg sm:text-2xl font-black text-blue-700">Rs.{totalAmount.toLocaleString()}</p>
             </div>
           </div>
         </div>
@@ -3843,10 +3936,10 @@ function showNotification(type, message) {
   notification.style.setProperty('z-index', '2147483647', 'important') // Max Z-Index
 
   notification.innerHTML = `
-    ${type === 'success' ? '<div class="animate-bounce">🎉</div>' :
-      type === 'error' ? '<div class="animate-pulse">⚠️</div>' :
-        type === 'warning' ? '<div class="animate-pulse">🔔</div>' :
-          '<div class="animate-pulse">ℹ️</div>'}
+    ${type === 'success' ? '<div class="animate-bounce"></div>' :
+      type === 'error' ? '<div class="animate-pulse">(!)</div>' :
+        type === 'warning' ? '<div class="animate-pulse">(!)</div>' :
+          '<div class="animate-pulse">(i)</div>'}
     <div>
       <p class="font-bold text-sm">${type === 'success' ? 'Success!' : type === 'error' ? 'Error!' : type === 'warning' ? 'Warning!' : 'Info!'}</p>
       <p class="text-xs opacity-90">${message}</p>

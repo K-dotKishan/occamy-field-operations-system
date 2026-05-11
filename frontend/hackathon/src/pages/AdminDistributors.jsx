@@ -4,8 +4,12 @@ import { api } from "../api"
 import occamyLogo from "../assets/occamylogo.jpg"
 import {
   Users, TrendingUp, Package, MapPin, ArrowLeft,
-  RefreshCw, Navigation, Search, X
+  RefreshCw, Navigation, Search, X, BarChart3
 } from "lucide-react"
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  LineChart, Line, CartesianGrid, Legend
+} from "recharts"
 
 /* ── helpers ─────────────────────────────────────────────── */
 const fmtDist  = (n) => parseFloat(n || 0).toFixed(2)
@@ -20,7 +24,9 @@ export default function AdminDistributors() {
   const [autoRefresh, setAutoRefresh] = useState(true)
   const [selectedDist, setSelectedDist] = useState(null)
   const [distSales, setDistSales]     = useState([])
+  const [distAnalytics, setDistAnalytics] = useState(null)
   const [salesLoading, setSalesLoading] = useState(false)
+  const [monthlyChart, setMonthlyChart] = useState(null)
   const [isScrolled, setIsScrolled]   = useState(false)
 
   /* scroll shadow */
@@ -50,6 +56,13 @@ export default function AdminDistributors() {
 
   useEffect(() => { loadDistributors() }, [loadDistributors])
 
+  // Load monthly chart once on mount
+  useEffect(() => {
+    api("/admin/distributors/monthly-chart")
+      .then(d => setMonthlyChart(d))
+      .catch(() => {})
+  }, [])
+
   /* auto-refresh every 10 s */
   useEffect(() => {
     if (!autoRefresh) return
@@ -59,10 +72,15 @@ export default function AdminDistributors() {
 
   const openDetail = async (dist) => {
     setSelectedDist(dist)
+    setDistAnalytics(null)
     setSalesLoading(true)
     try {
-      const s = await api(`/admin/distributors/${dist._id}/sales`)
+      const [s, a] = await Promise.all([
+        api(`/admin/distributors/${dist._id}/sales`),
+        api(`/admin/distributors/${dist._id}/analytics?days=30`)
+      ])
       setDistSales(s || [])
+      setDistAnalytics(a || null)
     } catch (_) { setDistSales([]) }
     finally { setSalesLoading(false) }
   }
@@ -143,11 +161,11 @@ export default function AdminDistributors() {
             {/* KPI STAT ROW */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14, marginBottom: 28 }}>
               {[
-                { label: "TOTAL DISTRIBUTORS", value: s.totalDistributors ?? 0,  grad: "linear-gradient(135deg,#6366f1,#4f46e5)", icon: <Users size={22} /> },
-                { label: "ACTIVE TODAY",        value: s.activeDistributors ?? 0, grad: "linear-gradient(135deg,#22c55e,#16a34a)", icon: <span style={{ fontSize: 18 }}>🟢</span> },
-                { label: "FLEET DISTANCE",      value: fmtDist(s.totalFleetDistance) + " km", grad: "linear-gradient(135deg,#f97316,#ea580c)", icon: <Navigation size={22} /> },
-                { label: "TODAY'S REVENUE",     value: fmtMoney(s.totalTodayRevenue), grad: "linear-gradient(135deg,#14b8a6,#0d9488)", icon: <TrendingUp size={22} /> },
-                { label: "TOTAL STOCK",         value: s.totalStock ?? 0,          grad: "linear-gradient(135deg,#a855f7,#9333ea)", icon: <Package size={22} /> },
+                { label: "TOTAL DISTRIBUTORS", value: s.totalDistributors ?? 0,  grad: "linear-gradient(135deg,#3b758c,#1797a6)", icon: <Users size={22} /> },
+                { label: "ACTIVE TODAY",        value: s.activeDistributors ?? 0, grad: "linear-gradient(135deg,#3b758c,#1797a6)", icon: <span style={{ fontSize: 18 }}>🟢</span> },
+                { label: "FLEET DISTANCE",      value: fmtDist(s.totalFleetDistance) + " km", grad: "linear-gradient(135deg,#3b758c,#1797a6)", icon: <Navigation size={22} /> },
+                { label: "TODAY'S REVENUE",     value: fmtMoney(s.totalTodayRevenue), grad: "linear-gradient(135deg,#3b758c,#1797a6)", icon: <TrendingUp size={22} /> },
+                { label: "TOTAL STOCK",         value: s.totalStock ?? 0,          grad: "linear-gradient(135deg,#3b758c,#1797a6)", icon: <Package size={22} /> },
               ].map(k => (
                 <div key={k.label} style={{ background: k.grad, borderRadius: 18, padding: "18px 16px", color: "#fff", boxShadow: "0 6px 20px rgba(0,0,0,.12)" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
@@ -158,6 +176,37 @@ export default function AdminDistributors() {
                 </div>
               ))}
             </div>
+
+            {/* MONTHLY SALES OVERVIEW CHART */}
+            {monthlyChart && (
+              <div style={{ background: "#fff", borderRadius: 20, padding: "24px", marginBottom: 24, boxShadow: "0 4px 24px rgba(62,62,92,.08)", border: "1px solid #e0e7ff" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                  <div>
+                    <h3 style={{ margin: 0, fontWeight: 800, color: "#3E3E5C", fontSize: 16, display: "flex", alignItems: "center", gap: 8 }}>
+                      <BarChart3 size={18} color="#6366f1" /> Monthly Sales Overview — {monthlyChart.summary?.month}
+                    </h3>
+                    <p style={{ margin: "4px 0 0", fontSize: 12, color: "#7A7490" }}>
+                      All distributors combined · ₹{(monthlyChart.summary?.totalRevenue || 0).toLocaleString()} total · {monthlyChart.summary?.totalSales || 0} transactions
+                    </p>
+                  </div>
+                </div>
+                <ResponsiveContainer width="100%" height={220}>
+                  <BarChart data={monthlyChart.chart || []} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                    <XAxis dataKey="date" tick={{ fontSize: 10 }} tickFormatter={d => d.slice(5)} />
+                    <YAxis tick={{ fontSize: 10 }} />
+                    <Tooltip
+                      formatter={(v, n) => [n === "revenue" ? `₹${v.toLocaleString()}` : v, n === "revenue" ? "Revenue" : "Qty Sold"]}
+                      labelFormatter={l => `Date: ${l}`}
+                      contentStyle={{ borderRadius: 10, fontSize: 12 }}
+                    />
+                    <Legend wrapperStyle={{ fontSize: 12 }} />
+                    <Bar dataKey="quantity" name="Qty Sold" fill="#6366f1" radius={[4,4,0,0]} />
+                    <Bar dataKey="revenue"  name="Revenue (₹)" fill="#14b8a6" radius={[4,4,0,0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
 
             {/* SEARCH + CONTROLS */}
             <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
@@ -354,8 +403,61 @@ export default function AdminDistributors() {
 
             {/* Sales history */}
             <div style={{ padding: "20px 24px" }}>
-              <h4 style={{ margin: "0 0 16px", color: "#3E3E5C", fontWeight: 800, fontSize: 15, display: "flex", alignItems: "center", gap: 8 }}>
-                <TrendingUp size={16} color="#0d9488" /> Sales History
+
+              {/* Daily Sales Bar Chart */}
+              {!salesLoading && distAnalytics?.dailyChart?.length > 0 && (
+                <div style={{ marginBottom: 24 }}>
+                  <h4 style={{ margin: "0 0 12px", color: "#3E3E5C", fontWeight: 800, fontSize: 15, display: "flex", alignItems: "center", gap: 8 }}>
+                    <BarChart3 size={16} color="#6366f1" /> Daily Sales — Last 30 Days
+                  </h4>
+                  <ResponsiveContainer width="100%" height={180}>
+                    <BarChart data={distAnalytics.dailyChart} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                      <XAxis dataKey="date" tick={{ fontSize: 9 }} tickFormatter={d => d.slice(5)} />
+                      <YAxis tick={{ fontSize: 9 }} />
+                      <Tooltip
+                        formatter={(v, n) => [n === "revenue" ? `₹${v.toLocaleString()}` : v, n === "revenue" ? "Revenue" : "Qty"]}
+                        contentStyle={{ borderRadius: 8, fontSize: 11 }}
+                      />
+                      <Bar dataKey="quantity" name="Qty Sold" fill="#6366f1" radius={[3,3,0,0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+
+              {/* Inventory Summary — Received / Sold / Remaining */}
+              {!salesLoading && distAnalytics?.inventorySummary?.length > 0 && (
+                <div style={{ marginBottom: 24 }}>
+                  <h4 style={{ margin: "0 0 12px", color: "#3E3E5C", fontWeight: 800, fontSize: 15, display: "flex", alignItems: "center", gap: 8 }}>
+                    <Package size={16} color="#9333ea" /> Stock Level (Received − Sold)
+                  </h4>
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                      <thead>
+                        <tr style={{ background: "#f9fafb" }}>
+                          {["Product", "Received", "Sold", "Remaining"].map(h => (
+                            <th key={h} style={{ padding: "8px 12px", textAlign: "left", fontWeight: 700, color: "#6b7280", fontSize: 11, textTransform: "uppercase", letterSpacing: .4, borderBottom: "1px solid #f3f4f6" }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {distAnalytics.inventorySummary.map((item, i) => (
+                          <tr key={i} style={{ borderBottom: "1px solid #f9fafb" }}>
+                            <td style={{ padding: "10px 12px", fontWeight: 600, color: "#3E3E5C" }}>{item.productName}{item.packSize ? ` (${item.packSize})` : ""}</td>
+                            <td style={{ padding: "10px 12px", color: "#0d9488", fontWeight: 700 }}>{item.quantityReceived}</td>
+                            <td style={{ padding: "10px 12px", color: "#f97316", fontWeight: 700 }}>{item.quantityDistributed}</td>
+                            <td style={{ padding: "10px 12px", fontWeight: 900, color: item.currentStock > 0 ? "#9333ea" : "#ef4444" }}>{item.currentStock}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Recent Sales List */}
+              <h4 style={{ margin: "0 0 12px", color: "#3E3E5C", fontWeight: 800, fontSize: 15, display: "flex", alignItems: "center", gap: 8 }}>
+                <TrendingUp size={16} color="#0d9488" /> Recent Sales
               </h4>
               {salesLoading && (
                 <div style={{ textAlign: "center", padding: "32px 0" }}>
@@ -363,24 +465,24 @@ export default function AdminDistributors() {
                 </div>
               )}
               {!salesLoading && distSales.length === 0 && (
-                <div style={{ textAlign: "center", padding: "32px 0", color: "#7A7490" }}>
-                  <div style={{ fontSize: 32, marginBottom: 8 }}>📭</div>
+                <div style={{ textAlign: "center", padding: "24px 0", color: "#7A7490" }}>
+                  <div style={{ fontSize: 28, marginBottom: 6 }}>📭</div>
                   <p style={{ fontSize: 13 }}>No sales recorded yet</p>
                 </div>
               )}
               {!salesLoading && distSales.map(s => (
-                <div key={s._id} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "12px 0", borderBottom: "1px solid #f3f4f6" }}>
+                <div key={s._id} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "10px 0", borderBottom: "1px solid #f3f4f6" }}>
                   <div>
-                    <div style={{ fontWeight: 700, color: "#3E3E5C", fontSize: 14 }}>{s.productName}</div>
-                    <div style={{ fontSize: 12, color: "#7A7490" }}>
+                    <div style={{ fontWeight: 700, color: "#3E3E5C", fontSize: 13 }}>{s.productName}</div>
+                    <div style={{ fontSize: 11, color: "#7A7490" }}>
                       {s.quantity}{s.packSize ? ` × ${s.packSize}` : ""} • {s.saleType === "B2C" ? (s.farmerName || "Farmer") : (s.distributorName || "Dealer")}
                     </div>
-                    {s.village && <div style={{ fontSize: 11, color: "#9ca3af" }}>{s.village}{s.district ? `, ${s.district}` : ""}</div>}
-                    <div style={{ fontSize: 11, color: "#9ca3af" }}>{new Date(s.createdAt).toLocaleString()}</div>
+                    {s.village && <div style={{ fontSize: 10, color: "#9ca3af" }}>{s.village}{s.district ? `, ${s.district}` : ""}</div>}
+                    <div style={{ fontSize: 10, color: "#9ca3af" }}>{new Date(s.createdAt).toLocaleString()}</div>
                   </div>
-                  <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 16 }}>
-                    <div style={{ fontWeight: 900, color: "#16a34a", fontSize: 15 }}>{fmtMoney(s.totalAmount)}</div>
-                    <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: s.saleType === "B2C" ? "#dcfce7" : "#dbeafe", color: s.saleType === "B2C" ? "#16a34a" : "#1d4ed8" }}>
+                  <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 12 }}>
+                    <div style={{ fontWeight: 900, color: "#16a34a", fontSize: 14 }}>{fmtMoney(s.totalAmount)}</div>
+                    <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 20, background: s.saleType === "B2C" ? "#dcfce7" : "#dbeafe", color: s.saleType === "B2C" ? "#16a34a" : "#1d4ed8" }}>
                       {s.saleType}
                     </span>
                   </div>

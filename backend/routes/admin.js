@@ -5,7 +5,7 @@ import {
     getMapActivities, getMeetingDetail, getSaleDetail, createUser, updateUser,
     getLiveLocations, getLocationHistory, getOfficerTracking,
     getMessages, createMessage, getFieldOfficers, getOfficerMeetings,
-    getDistributors, getDistributorSales
+    getDistributors, getDistributorSales, getDistributorAnalytics, getDistributorMonthlyChart
 } from "../controllers/adminController.js"
 
 const router = express.Router()
@@ -27,6 +27,8 @@ router.post("/messages", auth, createMessage)
 router.get("/field-officers", auth, getFieldOfficers)
 router.get("/field-officers/:officerId/meetings", auth, getOfficerMeetings)
 router.get("/distributors", auth, getDistributors)
+router.get("/distributors/monthly-chart", auth, getDistributorMonthlyChart)
 router.get("/distributors/:distributorId/sales", auth, getDistributorSales)
+router.get("/distributors/:distributorId/analytics", auth, getDistributorAnalytics)
 
 export default router

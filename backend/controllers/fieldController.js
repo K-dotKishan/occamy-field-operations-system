@@ -165,6 +165,7 @@ export async function logOneToOneMeeting(req, res) {
         const parseLoc = (loc) => { try { return typeof loc === 'string' ? JSON.parse(loc) : (typeof loc === 'object' && loc !== null ? loc : { lat: 0, lng: 0 }) } catch { return { lat: 0, lng: 0 } } }
         const location = parseLoc(req.body.location)
 
+        // ── Save the activity record — this is the critical path ──────────
         const activity = await Activity.create({
             userId: req.user.id, type: "ONE_TO_ONE",
             personName: req.body.personName, contactNumber: req.body.contactNumber, category: req.body.category,
@@ -177,23 +178,28 @@ export async function logOneToOneMeeting(req, res) {
             followUpRequired: req.body.followUpRequired === 'true', followUpDate: req.body.followUpDate || undefined
         })
 
-        LocationLog.create({ userId: req.user.id, location, activity: "MEETING", timestamp: new Date() }).catch(err => console.error("Failed to log meeting location:", err.message))
+        // ── Respond immediately — side-effects run independently ──────────
+        res.json(activity)
 
-        try {
-            const today = new Date(); today.setHours(0, 0, 0, 0)
-            const att = await Attendance.findOne({ userId: req.user.id, startTime: { $gte: today } }).sort({ startTime: -1 })
-            const officer = await User.findById(req.user.id).select('name phone')
+        // ── Fire-and-forget: location log + admin message (non-blocking) ──
+        LocationLog.create({ userId: req.user.id, location, activity: "MEETING", timestamp: new Date() })
+            .catch(err => console.error("Failed to log meeting location:", err.message))
+
+        // Fetch officer name and today's distance without blocking the response
+        Promise.all([
+            Attendance.findOne({ userId: req.user.id, startTime: { $gte: (() => { const d = new Date(); d.setHours(0,0,0,0); return d })() } }).sort({ startTime: -1 }).select("totalDistance").lean(),
+            User.findById(req.user.id).select('name phone').lean()
+        ]).then(([att, officer]) => {
             AdminMessage.create({
                 officerId: req.user.id, officerName: officer?.name || 'Field Officer', officerPhone: officer?.phone || '',
                 text: `One-to-one meeting with ${req.body.personName || 'participant'}${req.body.notes ? ' - ' + req.body.notes.slice(0, 200) : ''}`,
                 location, distanceTravelled: att?.totalDistance || 0, status: 'MEETING', meetingType: 'ONE_TO_ONE', timestamp: new Date()
             }).catch(err => console.error("Failed to create admin message:", err.message))
-        } catch (msgErr) { console.error('Error preparing admin message:', msgErr) }
+        }).catch(err => console.error('Error preparing admin message:', err))
 
-        res.json(activity)
     } catch (err) {
         console.error("Meeting logging error:", err)
-        res.status(500).json({ error: "Failed to log meeting: " + err.message })
+        if (!res.headersSent) res.status(500).json({ error: "Failed to log meeting: " + err.message })
     }
 }
 
@@ -227,27 +233,33 @@ export async function logMeeting(req, res) {
             activityPayload.meetingType = req.body.meetingTypeDetail || req.body.meetingType || ''; activityPayload.location = location
         }
 
+        // ── Critical path: save activity, respond immediately ─────────────
         const activity = await Activity.create(activityPayload)
-        if (activity.location?.lat) LocationLog.create({ userId: req.user.id, location: activity.location, activity: 'MEETING' }).catch(e => console.error("Loc log error:", e.message))
+        res.status(201).json(activity)
 
-        try {
-            const today = new Date(); today.setHours(0, 0, 0, 0)
-            const att = await Attendance.findOne({ userId: req.user.id, startTime: { $gte: today } }).sort({ startTime: -1 })
-            const officer = await User.findById(req.user.id).select('name phone')
+        // ── Fire-and-forget side-effects (non-blocking) ───────────────────
+        if (activity.location?.lat) {
+            LocationLog.create({ userId: req.user.id, location: activity.location, activity: 'MEETING' })
+                .catch(e => console.error("Loc log error:", e.message))
+        }
+
+        Promise.all([
+            Attendance.findOne({ userId: req.user.id, startTime: { $gte: (() => { const d = new Date(); d.setHours(0,0,0,0); return d })() } }).sort({ startTime: -1 }).select("totalDistance").lean(),
+            User.findById(req.user.id).select('name phone').lean()
+        ]).then(([att, officer]) => {
             const text = activity.type === 'ONE_TO_ONE'
                 ? `One-to-one meeting with ${activity.personName || 'participant'}${activity.notes ? ' - ' + activity.notes.slice(0, 200) : ''}`
                 : `Group meeting at ${activity.village || 'unknown'} with ${activity.attendeesCount || 0} attendees${activity.notes ? ' - ' + activity.notes.slice(0, 200) : ''}`
-            await AdminMessage.create({
+            AdminMessage.create({
                 officerId: req.user.id, officerName: officer?.name || 'Field Officer', officerPhone: officer?.phone || '',
                 text, location: activity.location || { lat: 0, lng: 0, address: '' },
                 distanceTravelled: att?.totalDistance || 0, status: 'MEETING', meetingType: activity.type, timestamp: new Date()
-            })
-        } catch (msgErr) { console.error('Failed to create admin message for JSON meeting:', msgErr) }
+            }).catch(e => console.error("Admin message error:", e.message))
+        }).catch(err => console.error('Failed to create admin message for JSON meeting:', err))
 
-        res.status(201).json(activity)
     } catch (err) {
         console.error('JSON meeting logging error:', err)
-        res.status(500).json({ error: 'Failed to log meeting', details: err.message })
+        if (!res.headersSent) res.status(500).json({ error: 'Failed to log meeting', details: err.message })
     }
 }
 
@@ -260,28 +272,33 @@ export async function logGroupMeeting(req, res) {
         const parseLoc = (loc) => { try { return typeof loc === 'string' ? JSON.parse(loc) : (typeof loc === 'object' && loc !== null ? loc : { lat: 0, lng: 0 }) } catch { return { lat: 0, lng: 0 } } }
         const location = parseLoc(req.body.location)
 
+        // ── Critical path: save activity, respond immediately ─────────────
         const activity = await Activity.create({
             userId: req.user.id, type: "GROUP",
             village: req.body.village, district: req.body.district, state: req.body.state,
             attendeesCount: parseInt(req.body.attendeesCount), meetingType: req.body.meetingType,
             category: req.body.category || "FARMER", location, notes: req.body.notes, photos: photoUrls
         })
-
-        LocationLog.create({ userId: req.user.id, location, activity: "MEETING" }).catch(e => console.error("Group meeting loc log error:", e.message))
-
-        const today = new Date(); today.setHours(0, 0, 0, 0)
-        const att = await Attendance.findOne({ userId: req.user.id, startTime: { $gte: today } }).sort({ startTime: -1 })
-        const officer = await User.findById(req.user.id).select('name phone')
-        AdminMessage.create({
-            officerId: req.user.id, officerName: officer?.name || 'Field Officer', officerPhone: officer?.phone || '',
-            text: `Group meeting at ${req.body.village || 'unknown'} with ${req.body.attendeesCount || 0} attendees${req.body.notes ? ' - ' + req.body.notes.slice(0, 200) : ''}`,
-            location, distanceTravelled: att?.totalDistance || 0, status: 'MEETING', meetingType: 'GROUP', timestamp: new Date()
-        }).catch(e => console.error('Failed to create admin message for group meeting:', e))
-
         res.json(activity)
+
+        // ── Fire-and-forget side-effects (non-blocking) ───────────────────
+        LocationLog.create({ userId: req.user.id, location, activity: "MEETING" })
+            .catch(e => console.error("Group meeting loc log error:", e.message))
+
+        Promise.all([
+            Attendance.findOne({ userId: req.user.id, startTime: { $gte: (() => { const d = new Date(); d.setHours(0,0,0,0); return d })() } }).sort({ startTime: -1 }).select("totalDistance").lean(),
+            User.findById(req.user.id).select('name phone').lean()
+        ]).then(([att, officer]) => {
+            AdminMessage.create({
+                officerId: req.user.id, officerName: officer?.name || 'Field Officer', officerPhone: officer?.phone || '',
+                text: `Group meeting at ${req.body.village || 'unknown'} with ${req.body.attendeesCount || 0} attendees${req.body.notes ? ' - ' + req.body.notes.slice(0, 200) : ''}`,
+                location, distanceTravelled: att?.totalDistance || 0, status: 'MEETING', meetingType: 'GROUP', timestamp: new Date()
+            }).catch(e => console.error('Failed to create admin message for group meeting:', e))
+        }).catch(err => console.error('Error preparing group meeting admin message:', err))
+
     } catch (err) {
         console.error("Group meeting error:", err)
-        res.status(500).json({ error: "Failed to log group meeting" })
+        if (!res.headersSent) res.status(500).json({ error: "Failed to log group meeting" })
     }
 }
 
