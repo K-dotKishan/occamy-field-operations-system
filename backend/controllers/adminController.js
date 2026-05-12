@@ -395,7 +395,8 @@ export async function getFieldOfficers(req, res) {
             todayMeetingsAgg,
             todaySamplesAgg,
             todayMeetingSamplesAgg,
-            lastLocations
+            lastLocations,
+            recentDailyLogs
         ] = await Promise.all([
             // Open attendance sessions → GPS active + live distance
             Attendance.find({ userId: { $in: officerIds }, endTime: null })
@@ -437,7 +438,17 @@ export async function getFieldOfficers(req, res) {
                         accuracy: { $first: "$accuracy" }
                     }
                 }
-            ])
+            ]),
+
+            // Last 2 days of completed attendance sessions per officer (dailyLogs)
+            Attendance.find({
+                userId: { $in: officerIds },
+                endTime: { $ne: null },
+                startTime: { $gte: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000) }
+            })
+                .select("userId startTime endTime totalDistance startLocation endLocation")
+                .sort({ startTime: -1 })
+                .lean()
         ])
 
         // Build O(1) lookup maps — keys are string IDs
@@ -454,10 +465,31 @@ export async function getFieldOfficers(req, res) {
             distanceMap.set(id, (distanceMap.get(id) || 0) + (a.totalDistance || 0))
         })
 
+        // Group last-2-days completed sessions per officer
+        const dailyLogsMap = new Map()
+        recentDailyLogs.forEach(a => {
+            const id = a.userId.toString()
+            if (!dailyLogsMap.has(id)) dailyLogsMap.set(id, [])
+            dailyLogsMap.get(id).push({
+                startTime:     a.startTime,
+                endTime:       a.endTime,
+                totalDistance: parseFloat((a.totalDistance || 0).toFixed(3)),
+                startLocation: a.startLocation || null,
+                endLocation:   a.endLocation   || null
+            })
+        })
+
         const result = fieldOfficers.map(officer => {
             const id  = officer._id.toString()
             const att = activeAttMap.get(id)
             const loc = locationMap.get(id)
+
+            // currentSession: the live open attendance record (null if day not started)
+            const currentSession = att ? {
+                isActive:      true,
+                startTime:     att.startTime,
+                totalDistance: parseFloat((att.totalDistance || 0).toFixed(6))
+            } : { isActive: false, startTime: null, totalDistance: 0 }
 
             return {
                 _id:              officer._id,
@@ -473,8 +505,8 @@ export async function getFieldOfficers(req, res) {
                 lastLocationTime: loc?.timestamp || null,
                 locationAccuracy: loc?.accuracy  || null,
                 meetingsToday:    meetingMap.get(id) || 0,
-                // samplesToday = Sample records + meetings where productSampleGiven=true
-                samplesToday:     (sampleMap.get(id) || 0) + (meetingSampleMap.get(id) || 0)
+                samplesToday:     (sampleMap.get(id) || 0) + (meetingSampleMap.get(id) || 0),
+                currentSession
             }
         })
 

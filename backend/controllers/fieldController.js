@@ -110,24 +110,12 @@ export async function endAttendance(req, res) {
         const attendance = await Attendance.findOne({ userId: req.user.id, endTime: null }).sort({ startTime: -1 })
         if (!attendance) return res.status(400).json({ error: "No active day found" })
 
-        // ── Time-gate: require at least 7 hours since Day Start ──────────────
-        const MIN_HOURS = 7
         const elapsedMs = Date.now() - new Date(attendance.startTime).getTime()
         const elapsedHours = elapsedMs / (1000 * 60 * 60)
-        if (elapsedHours < MIN_HOURS) {
-            const remaining = Math.ceil((MIN_HOURS * 60) - (elapsedMs / (1000 * 60)))
-            return res.status(400).json({
-                error: `Day End is locked. You must work at least ${MIN_HOURS} hours. ${remaining} minute(s) remaining.`,
-                code: "TIME_GATE",
-                remainingMinutes: remaining
-            })
-        }
 
-        // ── Distance validation: pull the latest persisted distance ──────────
-        // Prefer GPS-accumulated totalDistance; fall back to odometer diff if provided
+        // Use GPS-accumulated distance; fall back to odometer diff if GPS is zero
         const gpsDistance = attendance.totalDistance || 0
         const odometerDistance = req.body.odometer ? req.body.odometer - (attendance.startOdometer || 0) : null
-        // Use odometer only when GPS distance is 0 (officer didn't track) and odometer was supplied
         const finalDistance = gpsDistance > 0 ? gpsDistance : (odometerDistance !== null && odometerDistance >= 0 ? odometerDistance : 0)
 
         attendance.endTime = new Date()

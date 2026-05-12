@@ -1,4 +1,4 @@
-import { socket } from "../socket"
+﻿import { socket } from "../socket"
 import occamyLogo from "../assets/occamylogo.jpg"
 import { MapContainer, TileLayer, Marker, Polyline, Popup, Circle } from "react-leaflet"
 import "leaflet/dist/leaflet.css"
@@ -85,8 +85,6 @@ export default function Dashboard() {
   // Field attendance states
   const [activeAttendance, setActiveAttendance] = useState(null)
   const [isEndingDay, setIsEndingDay] = useState(false)
-  const [canEndDay, setCanEndDay] = useState(false)          // time-gate flag
-  const [endDayCountdown, setEndDayCountdown] = useState("") // human-readable remaining time
   const menuRef = useRef(null) // Ref for mobile menu click outside detection
 
   /* ================= AUTH + DATA LOAD ================= */
@@ -215,37 +213,6 @@ export default function Dashboard() {
 
     return () => navigator.geolocation.clearWatch(watchId)
   }, [role])
-
-  /* ================= TIME-GATE: ENABLE END DAY AFTER 7 HOURS ================= */
-  useEffect(() => {
-    if (!activeAttendance?.startTime) {
-      setCanEndDay(false)
-      setEndDayCountdown("")
-      return
-    }
-
-    const MIN_MS = 7 * 60 * 60 * 1000 // 7 hours in ms
-
-    const tick = () => {
-      const elapsed = Date.now() - new Date(activeAttendance.startTime).getTime()
-      const remaining = MIN_MS - elapsed
-
-      if (remaining <= 0) {
-        setCanEndDay(true)
-        setEndDayCountdown("")
-      } else {
-        setCanEndDay(false)
-        const h = Math.floor(remaining / (1000 * 60 * 60))
-        const m = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60))
-        const s = Math.floor((remaining % (1000 * 60)) / 1000)
-        setEndDayCountdown(`${h}h ${m}m ${s}s`)
-      }
-    }
-
-    tick() // run immediately
-    const interval = setInterval(tick, 1000)
-    return () => clearInterval(interval)
-  }, [activeAttendance?.startTime])
 
   /* ================= SOCKET CONNECTIONS ================= */
   useEffect(() => {
@@ -583,21 +550,10 @@ export default function Dashboard() {
 
   /* ================= FIELD: END DAY ================= */
   const endDay = async () => {
+    if (!window.confirm("Are you sure you want to end your day? This cannot be undone.")) return
+
     if (!navigator.geolocation) {
       showNotification("error", "Geolocation not supported")
-      return
-    }
-
-    // Client-side time-gate guard (mirrors backend)
-    if (!canEndDay) {
-      showNotification("warning", `Day End locked. ${endDayCountdown} remaining before you can end the day.`)
-      return
-    }
-
-    // Distance verification: warn if no distance was recorded
-    const currentDistance = fieldStats?.distanceTraveled || 0
-    if (currentDistance === 0 && isTracking) {
-      showNotification("warning", "No distance recorded yet. GPS tracking is active -- please wait a moment and try again.")
       return
     }
 
@@ -617,7 +573,7 @@ export default function Dashboard() {
         lng: position.coords.longitude
       }
 
-      // End attendance -- backend will validate time-gate and capture final distance
+      // End attendance -- backend will capture final distance
       const result = await api("/field/attendance/end", "POST", {
         location: coords,
         timestamp: new Date().toISOString()
@@ -630,7 +586,7 @@ export default function Dashboard() {
       setActiveAttendance(null)
       localStorage.removeItem("activeAttendance")
 
-      const dist = result?.summary?.totalDistance ?? currentDistance
+      const dist = result?.summary?.totalDistance ?? (fieldStats?.distanceTraveled || 0)
       const hrs = result?.summary?.durationHours ?? ""
       showNotification("success", `Day ended! Distance: ${parseFloat(dist).toFixed(2)} km${hrs ? ` | Duration: ${hrs}h` : ""}. See you tomorrow.`)
       setIsEndingDay(false)
@@ -638,12 +594,7 @@ export default function Dashboard() {
     } catch (error) {
       console.error("Error ending day:", error)
       const errorMsg = error?.error || error?.message || "Unknown error"
-      // Surface time-gate errors clearly
-      if (error?.code === "TIME_GATE" || errorMsg.includes("locked") || errorMsg.includes("hours")) {
-        showNotification("warning", errorMsg)
-      } else {
-        showNotification("error", "Failed to end day: " + errorMsg)
-      }
+      showNotification("error", "Failed to end day: " + errorMsg)
       setIsEndingDay(false)
     }
   }
@@ -1762,10 +1713,10 @@ export default function Dashboard() {
                 <ActionButton
                   icon={<MapPin size={20} />}
                   label="End Day"
-                  subtitle={canEndDay ? "Close attendance" : (endDayCountdown ? `Locked: ${endDayCountdown}` : "Close attendance")}
-                  color={canEndDay ? "from-red-500 to-rose-600" : "from-gray-400 to-gray-500"}
+                  subtitle="Clock out for the day"
+                  color="from-[#3b758c] to-[#1797a6]"
                   onClick={endDay}
-                  disabled={isEndingDay || !canEndDay}
+                  disabled={isEndingDay}
                   delay={0}
                 />
               )}
@@ -2773,10 +2724,10 @@ function EnhancedAttendanceRow({ attendance, delay = 0 }) {
           </span>
           {attendance.endTime ? (
             <span className="flex items-center gap-1">
-              -> {new Date(attendance.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              {"->"}  {new Date(attendance.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </span>
           ) : (
-            <span className="text-green-600 font-semibold">-> ongoing</span>
+            <span className="text-green-600 font-semibold">{"->"}  ongoing</span>
           )}
           <span className="flex items-center gap-1 font-semibold text-blue-600">
             ^ {durationH}h {durationM}m
