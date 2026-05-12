@@ -181,6 +181,11 @@ export default function Dashboard() {
       async (pos) => {
         const { latitude: lat, longitude: lng, accuracy } = pos.coords
 
+        // Guard: only send location if there is an active session
+        // This prevents the background watcher from accumulating distance
+        // before the officer has clicked "Start Day"
+        if (!activeAttendance) return
+
         // Throttle: skip if we haven't moved 10 m since last API call
         if (lastSentLat !== null && lastSentLng !== null) {
           // Inline haversine -- no external dependency needed
@@ -212,7 +217,7 @@ export default function Dashboard() {
     )
 
     return () => navigator.geolocation.clearWatch(watchId)
-  }, [role])
+  }, [role, activeAttendance])
 
   /* ================= SOCKET CONNECTIONS ================= */
   useEffect(() => {
@@ -326,7 +331,12 @@ export default function Dashboard() {
 
       // Fetch Stats Summary
       const summary = await api("/field/summary")
-      setFieldStats(summary.today)
+      // If no active session, force distance to 0 regardless of what the summary returns
+      if (!data.activeAttendance) {
+        setFieldStats({ ...(summary.today || {}), distanceTraveled: 0 })
+      } else {
+        setFieldStats(summary.today)
+      }
     } catch (error) {
       console.error("Failed to load field data:", error)
       // On network error, restore from localStorage so the UI doesn't reset
@@ -530,6 +540,9 @@ export default function Dashboard() {
         timestamp: new Date().toISOString()
       })
 
+      // Reset distance to 0 for the new session — clean slate
+      setFieldStats(prev => ({ ...prev, distanceTraveled: 0 }))
+
       // Start live tracking automatically
       startLiveTracking(false)
 
@@ -573,7 +586,7 @@ export default function Dashboard() {
         lng: position.coords.longitude
       }
 
-      // End attendance -- backend will capture final distance
+      // End attendance — backend saves final distance into the Attendance doc (dailyLog)
       const result = await api("/field/attendance/end", "POST", {
         location: coords,
         timestamp: new Date().toISOString()
@@ -585,6 +598,9 @@ export default function Dashboard() {
       // Clear active attendance state and localStorage
       setActiveAttendance(null)
       localStorage.removeItem("activeAttendance")
+
+      // Immediately reset live distance to 0 — session is over
+      setFieldStats(prev => ({ ...prev, distanceTraveled: 0 }))
 
       const dist = result?.summary?.totalDistance ?? (fieldStats?.distanceTraveled || 0)
       const hrs = result?.summary?.durationHours ?? ""
@@ -1691,7 +1707,7 @@ export default function Dashboard() {
               />
               <StatCard
                 label="DISTANCE"
-                value={`${(fieldStats?.distanceTraveled || 0).toFixed(2)} km`}
+                value={`${(!activeAttendance ? 0 : (fieldStats?.distanceTraveled || 0)).toFixed(2)} km`}
                 icon={<Navigation size={20} />}
                 color="from-[#3b758c] to-[#1797a6]"
                 delay={300}

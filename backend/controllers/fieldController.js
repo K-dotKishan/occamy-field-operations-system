@@ -89,13 +89,19 @@ export async function startAttendance(req, res) {
         const activeAttendance = await Attendance.findOne({ userId: req.user.id, endTime: null })
         if (activeAttendance) return res.status(400).json({ error: "Day already started. Please end the current day first." })
 
+        // Create a fresh session — totalDistance is explicitly 0 (clean slate)
         const attendance = await Attendance.create({
             userId: req.user.id,
             startLocation: { lat: req.body.location.lat, lng: req.body.location.lng, address: req.body.location.address || "" },
             startTime: new Date(),
-            startOdometer: req.body.odometer || 0
+            startOdometer: req.body.odometer || 0,
+            totalDistance: 0
         })
-        res.json(attendance)
+
+        res.json({
+            ...attendance.toObject(),
+            resetDistance: 0   // signal to frontend: distance starts at 0
+        })
     } catch (err) {
         console.error("Start day error:", err)
         res.status(500).json({ error: "Failed to start day" })
@@ -128,15 +134,27 @@ export async function endAttendance(req, res) {
         attendance.totalDistance = parseFloat(finalDistance.toFixed(3))
         await attendance.save()
 
+        // Build the dailyLog entry that the admin panel reads
+        const dailyLog = {
+            startTime:     attendance.startTime,
+            endTime:       attendance.endTime,
+            totalDistance: attendance.totalDistance,
+            startLocation: attendance.startLocation || null,
+            endLocation:   attendance.endLocation   || null,
+            durationHours: parseFloat(elapsedHours.toFixed(2))
+        }
+
         res.json({
             message: "Day ended successfully",
             attendance,
+            dailyLog,           // completed session — admin can read this directly
             summary: {
                 totalDistance: attendance.totalDistance,
-                startTime: attendance.startTime,
-                endTime: attendance.endTime,
+                startTime:     attendance.startTime,
+                endTime:       attendance.endTime,
                 durationHours: parseFloat(elapsedHours.toFixed(2))
-            }
+            },
+            resetDistance: 0    // explicit signal to frontend: reset live distance to 0
         })
     } catch (err) {
         console.error("End day error:", err)
@@ -380,11 +398,12 @@ export async function trackLocation(req, res) {
         })
 
         // ── Distance accumulation ──────────────────────────────────────────
-        // Query by userId only so we always find the previous point even at
-        // the very start of a new attendance session.
+        // Scope the previous-point lookup to the CURRENT attendance session
+        // so a GPS point from a prior session never bleeds into this one.
         if (attendance) {
             const lastLog = await LocationLog.findOne({
                 userId: req.user.id,
+                attendanceId: attendance._id,   // same session only
                 _id: { $ne: locationLog._id }
             }).sort({ timestamp: -1 })
 

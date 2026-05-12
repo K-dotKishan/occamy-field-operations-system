@@ -542,6 +542,58 @@ export async function getOfficerMeetings(req, res) {
     }
 }
 
+/* ================= OFFICER DAILY LOGS (distance history) ================= */
+export async function getOfficerDailyLogs(req, res) {
+    try {
+        if (req.user.role !== "ADMIN") return res.status(403).json({ error: "Forbidden" })
+
+        const days = parseInt(req.query.days) || 30
+        const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+
+        // Completed sessions only (endTime set) — these are the historical dailyLogs
+        const logs = await Attendance.find({
+            userId: req.params.officerId,
+            endTime: { $ne: null },
+            startTime: { $gte: since }
+        })
+            .select("startTime endTime totalDistance startLocation endLocation")
+            .sort({ startTime: -1 })
+            .lean()
+
+        // Active session (if any) — this is the currentSession
+        const currentSession = await Attendance.findOne({
+            userId: req.params.officerId,
+            endTime: null
+        })
+            .select("startTime totalDistance startLocation")
+            .lean()
+
+        res.json({
+            currentSession: currentSession
+                ? {
+                    isActive:      true,
+                    startTime:     currentSession.startTime,
+                    totalDistance: parseFloat((currentSession.totalDistance || 0).toFixed(3)),
+                    startLocation: currentSession.startLocation || null
+                }
+                : { isActive: false, startTime: null, totalDistance: 0 },
+            dailyLogs: logs.map(l => ({
+                startTime:     l.startTime,
+                endTime:       l.endTime,
+                totalDistance: parseFloat((l.totalDistance || 0).toFixed(3)),
+                startLocation: l.startLocation || null,
+                endLocation:   l.endLocation   || null,
+                durationHours: parseFloat(
+                    ((new Date(l.endTime) - new Date(l.startTime)) / (1000 * 60 * 60)).toFixed(2)
+                )
+            }))
+        })
+    } catch (err) {
+        console.error("Get officer daily logs error:", err)
+        res.status(500).json({ error: "Failed to fetch officer daily logs" })
+    }
+}
+
 /* ================= DISTRIBUTOR MANAGEMENT ================= */
 export async function getDistributors(req, res) {
     try {

@@ -253,10 +253,8 @@ export default function AdminDistributors() {
               </div>
 
               {/* Column headers */}
-              <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr 1.2fr", gap: 8, padding: "10px 20px", background: "#f9fafb", borderBottom: "1px solid #f3f4f6", fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: .5 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1.2fr", gap: 8, padding: "10px 20px", background: "#f9fafb", borderBottom: "1px solid #f3f4f6", fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: .5 }}>
                 <div>Distributor</div>
-                <div>Live Status</div>
-                <div>Distance</div>
                 <div>Today Revenue</div>
                 <div>Stock Level</div>
                 <div>Actions</div>
@@ -273,7 +271,7 @@ export default function AdminDistributors() {
 
               {filtered.map((d, idx) => (
                 <div key={d._id} style={{
-                  display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr 1.2fr",
+                  display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1.2fr",
                   gap: 8, padding: "14px 20px", borderBottom: "1px solid #f3f4f6",
                   background: idx % 2 === 0 ? "#fff" : "#fafafa",
                   alignItems: "center", transition: "background .15s"
@@ -300,34 +298,6 @@ export default function AdminDistributors() {
                     </div>
                   </div>
 
-                  {/* Live status */}
-                  <div>
-                    {d.isActive ? (
-                      <div>
-                        <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 20, background: "#dcfce7", color: "#16a34a", fontSize: 11, fontWeight: 700 }}>
-                          <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e" }} />
-                          GPS ON
-                        </span>
-                        {d.startTime && <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 3 }}>Since {fmtTime(d.startTime)}</div>}
-                      </div>
-                    ) : (
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 20, background: "#f3f4f6", color: "#6b7280", fontSize: 11, fontWeight: 700 }}>
-                        <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#9ca3af" }} />
-                        Offline
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Distance */}
-                  <div>
-                    <div style={{ fontWeight: 900, fontSize: 14, color: d.isActive ? "#f97316" : "#6b7280" }}>
-                      {fmtDist(d.totalDistance)} km
-                    </div>
-                    {d.lastLocationTime && (
-                      <div style={{ fontSize: 10, color: "#9ca3af" }}>{fmtTime(d.lastLocationTime)}</div>
-                    )}
-                  </div>
-
                   {/* Revenue */}
                   <div>
                     <div style={{ fontWeight: 900, fontSize: 14, color: "#0d9488" }}>{fmtMoney(d.todayRevenue)}</div>
@@ -348,12 +318,6 @@ export default function AdminDistributors() {
                       style={{ background: "#6366f1", color: "#fff", border: "none", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontFamily: "Poppins, sans-serif", fontWeight: 700, fontSize: 11 }}>
                       View Details
                     </button>
-                    {d.lastLocation?.lat && (
-                      <button onClick={() => navigate(`/dashboard?locate=${d._id}`)}
-                        style={{ background: "#f97316", color: "#fff", border: "none", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontFamily: "Poppins, sans-serif", fontWeight: 700, fontSize: 11 }}>
-                        Locate
-                      </button>
-                    )}
                   </div>
                 </div>
               ))}

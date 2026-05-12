@@ -73,32 +73,26 @@ const userSchema = new mongoose.Schema(
 export const User = mongoose.model("User", userSchema)
 
 /* ================= ATTENDANCE ================= */
-export const Attendance = mongoose.model(
-    "Attendance",
-    new mongoose.Schema(
-        {
-            userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-            startLocation: {
-                lat: Number,
-                lng: Number,
-                address: String
-            },
-            endLocation: {
-                lat: Number,
-                lng: Number,
-                address: String
-            },
-            startTime: { type: Date, default: Date.now },
-            endTime: Date,
-            startOdometer: Number, // NEW: Starting odometer reading
-            endOdometer: Number,   // NEW: Ending odometer reading
-            totalDistance: Number, // Calculated from odometer
-            villages: [String],    // Villages visited during the day
-            photos: [String]       // Photo URLs from the day
-        },
-        { timestamps: true }
-    )
+const attendanceSchema = new mongoose.Schema(
+    {
+        userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", index: true },
+        startLocation: { lat: Number, lng: Number, address: String },
+        endLocation:   { lat: Number, lng: Number, address: String },
+        startTime:     { type: Date, default: Date.now },
+        endTime:       Date,
+        startOdometer: Number,
+        endOdometer:   Number,
+        totalDistance: { type: Number, default: 0 }, // GPS-accumulated km, reset to 0 on Start Day
+        villages:      [String],
+        photos:        [String]
+    },
+    { timestamps: true }
 )
+// Compound indexes for the most common admin + field queries
+attendanceSchema.index({ userId: 1, endTime: 1 })   // "find open session"
+attendanceSchema.index({ userId: 1, startTime: -1 }) // "today's sessions"
+
+export const Attendance = mongoose.model("Attendance", attendanceSchema)
 
 /* ================= ACTIVITY (MEETINGS) ================= */
 export const Activity = mongoose.model(
@@ -296,11 +290,11 @@ export const LocationLog = mongoose.model(
     "LocationLog",
     new mongoose.Schema(
         {
-            userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-            attendanceId: { type: mongoose.Schema.Types.ObjectId, ref: "Attendance" },
+            userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", index: true },
+            attendanceId: { type: mongoose.Schema.Types.ObjectId, ref: "Attendance", index: true },
             location: { lat: Number, lng: Number, address: String },
             accuracy: Number, // in meters
-            timestamp: { type: Date, default: Date.now },
+            timestamp: { type: Date, default: Date.now, index: true },
             activity: String // "MEETING", "TRAVEL", "SAMPLE", "SALE"
         },
         { timestamps: true }

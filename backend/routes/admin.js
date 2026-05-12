@@ -4,7 +4,7 @@ import {
     getDashboard, getOfficerAnalytics, getGeographyAnalytics, getMonthlyReport,
     getMapActivities, getMeetingDetail, getSaleDetail, createUser, updateUser,
     getLiveLocations, getLocationHistory, getOfficerTracking,
-    getMessages, createMessage, getFieldOfficers, getOfficerMeetings,
+    getMessages, createMessage, getFieldOfficers, getOfficerMeetings, getOfficerDailyLogs,
     getDistributors, getDistributorSales, getDistributorAnalytics, getDistributorMonthlyChart
 } from "../controllers/adminController.js"
 
@@ -26,6 +26,7 @@ router.get("/messages", auth, getMessages)
 router.post("/messages", auth, createMessage)
 router.get("/field-officers", auth, getFieldOfficers)
 router.get("/field-officers/:officerId/meetings", auth, getOfficerMeetings)
+router.get("/field-officers/:officerId/daily-logs", auth, getOfficerDailyLogs)
 router.get("/distributors", auth, getDistributors)
 router.get("/distributors/monthly-chart", auth, getDistributorMonthlyChart)
 router.get("/distributors/:distributorId/sales", auth, getDistributorSales)
