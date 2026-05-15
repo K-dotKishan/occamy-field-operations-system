@@ -3,7 +3,8 @@ import { calculateDistance } from "../utils/distance.js"
 
 /* ================= UPLOAD PHOTO ================= */
 export async function uploadPhoto(req, res) {
-    res.json({ photoUrl: `/uploads/${req.file.filename}` })
+    // req.file.path is the full Cloudinary HTTPS URL when using multer-storage-cloudinary
+    res.json({ photoUrl: req.file.path })
 }
 
 /* ================= FIELD SUMMARY ================= */
@@ -167,7 +168,7 @@ export async function logOneToOneMeeting(req, res) {
     try {
         if (req.user.role !== "FIELD") return res.status(403).json({ error: "Only field officers allowed" })
 
-        const photoUrls = req.files ? req.files.map(f => `/uploads/${f.filename}`) : []
+        const photoUrls = req.files ? req.files.map(f => f.path) : []
         const parseLoc = (loc) => { try { return typeof loc === 'string' ? JSON.parse(loc) : (typeof loc === 'object' && loc !== null ? loc : { lat: 0, lng: 0 }) } catch { return { lat: 0, lng: 0 } } }
         const location = parseLoc(req.body.location)
 
@@ -274,7 +275,7 @@ export async function logGroupMeeting(req, res) {
     try {
         if (req.user.role !== "FIELD") return res.status(403).json({ error: "Only field officers allowed" })
 
-        const photoUrls = req.files ? req.files.map(f => `/uploads/${f.filename}`) : []
+        const photoUrls = req.files ? req.files.map(f => f.path) : []
         const parseLoc = (loc) => { try { return typeof loc === 'string' ? JSON.parse(loc) : (typeof loc === 'object' && loc !== null ? loc : { lat: 0, lng: 0 }) } catch { return { lat: 0, lng: 0 } } }
         const location = parseLoc(req.body.location)
 
@@ -313,7 +314,7 @@ export async function logSample(req, res) {
     try {
         if (req.user.role !== "FIELD") return res.status(403).json({ error: "Only field officers allowed" })
 
-        const photoUrls = req.files ? req.files.map(f => `/uploads/${f.filename}`) : []
+        const photoUrls = req.files ? req.files.map(f => f.path) : []
         const sample = await Sample.create({
             userId: req.user.id, productName: req.body.productName, productSKU: req.body.productSKU,
             quantity: parseFloat(req.body.quantity), unit: req.body.unit,
