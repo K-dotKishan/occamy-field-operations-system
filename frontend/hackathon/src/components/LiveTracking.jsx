@@ -8,12 +8,15 @@ export default function LiveTracking({ onLocationUpdate }) {
   const [lastUpdate, setLastUpdate] = useState(null)
   const [accuracy, setAccuracy] = useState(null)
   const [activity, setActivity] = useState("TRAVEL")
-  const [trackingStatus, setTrackingStatus] = useState("idle") // idle, tracking, stopped
+  const [trackingStatus, setTrackingStatus] = useState("idle")
   const [message, setMessage] = useState("")
   const trackingIntervalRef = useRef(null)
   const geolocationWatchRef = useRef(null)
+  // Throttle: only send one DB write per 10 seconds regardless of how often
+  // watchPosition fires. This prevents pool exhaustion on Atlas M0.
+  const lastSentRef = useRef(0)
+  const THROTTLE_MS = 10000
 
-  // Start real-time location tracking
   const startTracking = () => {
     if (!navigator.geolocation) {
       setMessage("❌ Geolocation not supported on this device")
@@ -24,7 +27,6 @@ export default function LiveTracking({ onLocationUpdate }) {
     setTrackingStatus("tracking")
     setMessage("📍 Starting real-time location tracking...")
 
-    // Watch position - continuous updates
     geolocationWatchRef.current = navigator.geolocation.watchPosition(
       async (position) => {
         const { latitude, longitude, accuracy: acc } = position.coords
@@ -32,7 +34,11 @@ export default function LiveTracking({ onLocationUpdate }) {
         setLocation({ lat: latitude, lng: longitude })
         setAccuracy(Math.round(acc))
 
-        // Send location to backend immediately
+        // Throttle DB writes — skip if last write was less than 10s ago
+        const now = Date.now()
+        if (now - lastSentRef.current < THROTTLE_MS) return
+        lastSentRef.current = now
+
         try {
           await api("/field/location/track", "POST", {
             lat: latitude,
@@ -43,7 +49,7 @@ export default function LiveTracking({ onLocationUpdate }) {
 
           setLastUpdate(new Date().toLocaleTimeString())
           setMessage(`✅ Location updated at ${new Date().toLocaleTimeString()}`)
-          if (onLocationUpdate) onLocationUpdate() // Trigger dashboard refresh
+          if (onLocationUpdate) onLocationUpdate()
         } catch (err) {
           console.error("Failed to track location:", err)
           setMessage("⚠️ Failed to sync location with server")
@@ -51,25 +57,18 @@ export default function LiveTracking({ onLocationUpdate }) {
       },
       (error) => {
         console.error("Geolocation error:", error)
-
-        // Code 1: Permission Denied (Fatal)
-        // Code 2: Position Unavailable (Temporary)
-        // Code 3: Timeout (Temporary)
-
         if (error.code === 1) {
           setMessage(`❌ Permission denied. Enable location access.`)
           setTrackingStatus("stopped")
           setIsTracking(false)
         } else {
-          // For timeout or unavailable, keep trying
           setMessage(`⚠️ GPS weak: ${error.message} - Retrying...`)
-          // Do NOT stop tracking
         }
       },
       {
         enableHighAccuracy: true,
-        maximumAge: 10000, // Accept cached positions up to 10s old (faster)
-        timeout: 30000     // Wait 30s before timing out (better for weak signals)
+        maximumAge: 10000,
+        timeout: 30000
       }
     )
   }

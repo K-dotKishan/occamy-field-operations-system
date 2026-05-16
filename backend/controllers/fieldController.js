@@ -1,5 +1,18 @@
 import { Attendance, Activity, Sale, Sample, LocationLog, AdminMessage, User, AnalyticsSummary, LocationTrack } from "../models/index.js"
 import { calculateDistance } from "../utils/distance.js"
+import { uploadBufferToCloudinary } from "../middleware/upload.js"
+
+// Upload all files in req.files to Cloudinary; returns array of secure URLs.
+// Uses Promise.allSettled so a single upload failure never crashes the whole batch.
+async function uploadFiles(files) {
+    if (!files || files.length === 0) return []
+    const results = await Promise.allSettled(
+        files.map(f => uploadBufferToCloudinary(f.buffer))
+    )
+    return results
+        .filter(r => r.status === "fulfilled")
+        .map(r => r.value)
+}
 
 /* ================= UPLOAD PHOTO ================= */
 export async function uploadPhoto(req, res) {
@@ -165,14 +178,18 @@ export async function endAttendance(req, res) {
 
 /* ================= LOG MEETING (ONE-TO-ONE) ================= */
 export async function logOneToOneMeeting(req, res) {
+    console.log("[ONE-TO-ONE] Route hit")
     try {
+        console.log("[ONE-TO-ONE] Auth passed, user:", req.user?.id, "role:", req.user?.role)
         if (req.user.role !== "FIELD") return res.status(403).json({ error: "Only field officers allowed" })
 
-        const photoUrls = req.files ? req.files.map(f => f.path) : []
+        console.log("[ONE-TO-ONE] Upload middleware finished, files:", req.files?.length ?? 0)
+
         const parseLoc = (loc) => { try { return typeof loc === 'string' ? JSON.parse(loc) : (typeof loc === 'object' && loc !== null ? loc : { lat: 0, lng: 0 }) } catch { return { lat: 0, lng: 0 } } }
         const location = parseLoc(req.body.location)
 
-        // ── Save the activity record — this is the critical path ──────────
+        console.log("[ONE-TO-ONE] DB save starting...")
+        // Save the activity — single DB write, no parallel queries
         const activity = await Activity.create({
             userId: req.user.id, type: "ONE_TO_ONE",
             personName: req.body.personName, contactNumber: req.body.contactNumber, category: req.body.category,
@@ -181,31 +198,36 @@ export async function logOneToOneMeeting(req, res) {
             followerCount: req.body.followerCount, agencyName: req.body.agencyName, territory: req.body.territory,
             businessPotential: req.body.businessPotential ? (typeof req.body.businessPotential === 'string' ? JSON.parse(req.body.businessPotential) : req.body.businessPotential) : undefined,
             location, village: req.body.village, district: req.body.district, state: req.body.state,
-            notes: req.body.notes, photos: photoUrls,
+            notes: req.body.notes, photos: [],
             followUpRequired: req.body.followUpRequired === 'true', followUpDate: req.body.followUpDate || undefined
         })
+        console.log("[ONE-TO-ONE] DB saved, id:", activity._id)
 
-        // ── Respond immediately — side-effects run independently ──────────
+        // ── Respond immediately ───────────────────────────────────────────
         res.json(activity)
+        console.log("[ONE-TO-ONE] Response sent")
 
-        // ── Fire-and-forget: location log + admin message (non-blocking) ──
+        // ── Fire-and-forget: Cloudinary upload + side-effects ─────────────
+        uploadFiles(req.files).then(photoUrls => {
+            if (photoUrls.length > 0) {
+                Activity.findByIdAndUpdate(activity._id, { photos: photoUrls }).catch(e => console.error("[ONE-TO-ONE] Photo URL update error:", e.message))
+            }
+        }).catch(e => console.error("[ONE-TO-ONE] Cloudinary upload error:", e.message))
+
         LocationLog.create({ userId: req.user.id, location, activity: "MEETING", timestamp: new Date() })
-            .catch(err => console.error("Failed to log meeting location:", err.message))
+            .catch(err => console.error("[ONE-TO-ONE] Location log error:", err.message))
 
-        // Fetch officer name and today's distance without blocking the response
-        Promise.all([
-            Attendance.findOne({ userId: req.user.id, startTime: { $gte: (() => { const d = new Date(); d.setHours(0,0,0,0); return d })() } }).sort({ startTime: -1 }).select("totalDistance").lean(),
-            User.findById(req.user.id).select('name phone').lean()
-        ]).then(([att, officer]) => {
+        // Fetch officer name only for the admin message (non-blocking)
+        User.findById(req.user.id).select('name phone').lean().then(officer => {
             AdminMessage.create({
                 officerId: req.user.id, officerName: officer?.name || 'Field Officer', officerPhone: officer?.phone || '',
                 text: `One-to-one meeting with ${req.body.personName || 'participant'}${req.body.notes ? ' - ' + req.body.notes.slice(0, 200) : ''}`,
-                location, distanceTravelled: att?.totalDistance || 0, status: 'MEETING', meetingType: 'ONE_TO_ONE', timestamp: new Date()
-            }).catch(err => console.error("Failed to create admin message:", err.message))
-        }).catch(err => console.error('Error preparing admin message:', err))
+                location, distanceTravelled: 0, status: 'MEETING', meetingType: 'ONE_TO_ONE', timestamp: new Date()
+            }).catch(err => console.error("[ONE-TO-ONE] Admin message error:", err.message))
+        }).catch(err => console.error("[ONE-TO-ONE] Officer lookup error:", err.message))
 
     } catch (err) {
-        console.error("Meeting logging error:", err)
+        console.error("[ONE-TO-ONE] Error in catch block:", err.message, err.stack)
         if (!res.headersSent) res.status(500).json({ error: "Failed to log meeting: " + err.message })
     }
 }
@@ -272,94 +294,175 @@ export async function logMeeting(req, res) {
 
 /* ================= LOG MEETING (GROUP) ================= */
 export async function logGroupMeeting(req, res) {
+    console.log("[GROUP] Route hit")
     try {
+        console.log("[GROUP] Auth passed, user:", req.user?.id, "role:", req.user?.role)
         if (req.user.role !== "FIELD") return res.status(403).json({ error: "Only field officers allowed" })
 
-        const photoUrls = req.files ? req.files.map(f => f.path) : []
+        console.log("[GROUP] Upload middleware finished, files:", req.files?.length ?? 0)
+
         const parseLoc = (loc) => { try { return typeof loc === 'string' ? JSON.parse(loc) : (typeof loc === 'object' && loc !== null ? loc : { lat: 0, lng: 0 }) } catch { return { lat: 0, lng: 0 } } }
         const location = parseLoc(req.body.location)
+        const attendeesCount = parseInt(req.body.attendeesCount) || 0
 
-        // ── Critical path: save activity, respond immediately ─────────────
+        console.log("[GROUP] DB save starting...")
         const activity = await Activity.create({
             userId: req.user.id, type: "GROUP",
             village: req.body.village, district: req.body.district, state: req.body.state,
-            attendeesCount: parseInt(req.body.attendeesCount), meetingType: req.body.meetingType,
-            category: req.body.category || "FARMER", location, notes: req.body.notes, photos: photoUrls
+            attendeesCount, meetingType: req.body.meetingType,
+            category: req.body.category || "FARMER", location, notes: req.body.notes, photos: []
         })
+        console.log("[GROUP] DB saved, id:", activity._id)
+
         res.json(activity)
+        console.log("[GROUP] Response sent")
 
-        // ── Fire-and-forget side-effects (non-blocking) ───────────────────
+        // ── Fire-and-forget ───────────────────────────────────────────────
+        uploadFiles(req.files).then(photoUrls => {
+            if (photoUrls.length > 0) {
+                Activity.findByIdAndUpdate(activity._id, { photos: photoUrls }).catch(e => console.error("[GROUP] Photo URL update error:", e.message))
+            }
+        }).catch(e => console.error("[GROUP] Cloudinary upload error:", e.message))
+
         LocationLog.create({ userId: req.user.id, location, activity: "MEETING" })
-            .catch(e => console.error("Group meeting loc log error:", e.message))
+            .catch(e => console.error("[GROUP] Location log error:", e.message))
 
-        Promise.all([
-            Attendance.findOne({ userId: req.user.id, startTime: { $gte: (() => { const d = new Date(); d.setHours(0,0,0,0); return d })() } }).sort({ startTime: -1 }).select("totalDistance").lean(),
-            User.findById(req.user.id).select('name phone').lean()
-        ]).then(([att, officer]) => {
+        User.findById(req.user.id).select('name phone').lean().then(officer => {
             AdminMessage.create({
                 officerId: req.user.id, officerName: officer?.name || 'Field Officer', officerPhone: officer?.phone || '',
-                text: `Group meeting at ${req.body.village || 'unknown'} with ${req.body.attendeesCount || 0} attendees${req.body.notes ? ' - ' + req.body.notes.slice(0, 200) : ''}`,
-                location, distanceTravelled: att?.totalDistance || 0, status: 'MEETING', meetingType: 'GROUP', timestamp: new Date()
-            }).catch(e => console.error('Failed to create admin message for group meeting:', e))
-        }).catch(err => console.error('Error preparing group meeting admin message:', err))
+                text: `Group meeting at ${req.body.village || 'unknown'} with ${attendeesCount} attendees${req.body.notes ? ' - ' + req.body.notes.slice(0, 200) : ''}`,
+                location, distanceTravelled: 0, status: 'MEETING', meetingType: 'GROUP', timestamp: new Date()
+            }).catch(e => console.error("[GROUP] Admin message error:", e.message))
+        }).catch(e => console.error("[GROUP] Officer lookup error:", e.message))
 
     } catch (err) {
-        console.error("Group meeting error:", err)
-        if (!res.headersSent) res.status(500).json({ error: "Failed to log group meeting" })
+        console.error("[GROUP] Error in catch block:", err.message, err.stack)
+        if (!res.headersSent) res.status(500).json({ error: "Failed to log group meeting: " + err.message })
     }
 }
 
 /* ================= DISTRIBUTE SAMPLE ================= */
 export async function logSample(req, res) {
+    console.log("[SAMPLE] Route hit")
     try {
         if (req.user.role !== "FIELD") return res.status(403).json({ error: "Only field officers allowed" })
 
-        const photoUrls = req.files ? req.files.map(f => f.path) : []
+        console.log("[SAMPLE] files:", req.files?.length ?? 0, "body keys:", Object.keys(req.body || {}))
+
+        const parseLoc = (loc) => { try { return typeof loc === 'string' ? JSON.parse(loc) : (typeof loc === 'object' && loc !== null ? loc : { lat: 0, lng: 0 }) } catch { return { lat: 0, lng: 0 } } }
+        const location = parseLoc(req.body.location)
+
         const sample = await Sample.create({
-            userId: req.user.id, productName: req.body.productName, productSKU: req.body.productSKU,
-            quantity: parseFloat(req.body.quantity), unit: req.body.unit,
-            recipientName: req.body.recipientName, recipientContact: req.body.recipientContact, recipientCategory: req.body.recipientCategory,
-            purpose: req.body.purpose, expectedFeedbackDate: req.body.expectedFeedbackDate || undefined,
-            location: JSON.parse(req.body.location), village: req.body.village, district: req.body.district, state: req.body.state, photos: photoUrls
+            userId: req.user.id,
+            productName: req.body.productName,
+            productSKU: req.body.productSKU,
+            quantity: parseFloat(req.body.quantity) || 0,
+            unit: req.body.unit,
+            recipientName: req.body.recipientName,
+            recipientContact: req.body.recipientContact,
+            recipientCategory: req.body.recipientCategory,
+            purpose: req.body.purpose,
+            expectedFeedbackDate: req.body.expectedFeedbackDate || undefined,
+            location,
+            village: req.body.village,
+            district: req.body.district,
+            state: req.body.state,
+            photos: [] // added async below
         })
-        LocationLog.create({ userId: req.user.id, location: JSON.parse(req.body.location), activity: "SAMPLE" }).catch(e => console.error("Sample loc log error:", e.message))
+        console.log("[SAMPLE] DB saved, id:", sample._id)
+
         res.json(sample)
+
+        // ── Fire-and-forget ───────────────────────────────────────────────
+        uploadFiles(req.files).then(photoUrls => {
+            if (photoUrls.length > 0) {
+                Sample.findByIdAndUpdate(sample._id, { photos: photoUrls }).catch(e => console.error("[SAMPLE] Photo URL update error:", e.message))
+            }
+        }).catch(e => console.error("[SAMPLE] Cloudinary upload error:", e.message))
+
+        LocationLog.create({ userId: req.user.id, location, activity: "SAMPLE" })
+            .catch(e => console.error("[SAMPLE] Location log error:", e.message))
+
     } catch (err) {
-        console.error("Sample distribution error:", err)
-        res.status(500).json({ error: "Failed to log sample distribution" })
+        console.error("[SAMPLE] Error in catch block:", err.message, err.stack)
+        if (!res.headersSent) res.status(500).json({ error: "Failed to log sample distribution: " + err.message })
     }
 }
 
 /* ================= RECORD SALE ================= */
 export async function logSale(req, res) {
+    console.log("[SALE] Route hit")
     try {
+        console.log("[SALE] Auth passed, user:", req.user?.id, "role:", req.user?.role)
         if (req.user.role !== "FIELD") return res.status(403).json({ error: "Only field officers allowed" })
+
+        console.log("[SALE] Upload middleware finished, files:", req.files?.length ?? 0)
 
         const parseLoc = (loc) => { try { return typeof loc === 'string' ? JSON.parse(loc) : (typeof loc === 'object' && loc !== null ? loc : { lat: 0, lng: 0 }) } catch { return { lat: 0, lng: 0 } } }
         const location = parseLoc(req.body.location)
 
-        const sale = await Sale.create({
-            userId: req.user.id, productName: req.body.productName, quantity: req.body.quantity,
-            pricePerUnit: req.body.price, totalAmount: req.body.totalAmount, saleType: req.body.saleType,
-            farmerName: req.body.farmerName, distributorName: req.body.distributorName,
-            village: req.body.village, district: req.body.district, state: req.body.state, location,
-            photos: req.body.photos || (req.body.photoUrl ? [req.body.photoUrl] : []), notes: req.body.notes
-        })
+        const saleType = (req.body.saleType || '').toUpperCase()
+        const quantity = parseFloat(req.body.quantity) || 0
+        const pricePerUnit = parseFloat(req.body.pricePerUnit) || 0
+        const totalAmount = parseFloat(req.body.totalAmount) || (quantity * pricePerUnit)
+        const customerName = req.body.customerName || ''
 
-        if (sale.location?.lat) LocationLog.create({ userId: req.user.id, location: sale.location, activity: 'SALE' }).catch(e => console.error("Sale loc log error:", e.message))
-        AdminMessage.create({ officerId: req.user.id, officerName: req.user.name || 'Field Officer', text: `New Sale: ${req.body.quantity}x ${req.body.productName} (₹${req.body.totalAmount})`, location, status: 'SALE', timestamp: new Date() }).catch(e => console.error("Sale admin msg error:", e.message))
+        console.log("[SALE] saleType:", saleType, "qty:", quantity, "total:", totalAmount)
+
+        console.log("[SALE] DB save starting...")
+        const sale = await Sale.create({
+            userId: req.user.id,
+            productName: req.body.productName,
+            productSKU: req.body.productSKU,
+            packSize: req.body.packSize,
+            quantity, pricePerUnit, totalAmount, saleType,
+            farmerName:         saleType === 'B2C' ? customerName : undefined,
+            farmerContact:      saleType === 'B2C' ? (req.body.customerContact || '') : undefined,
+            distributorName:    saleType === 'B2B' ? customerName : undefined,
+            distributorContact: saleType === 'B2B' ? (req.body.customerContact || '') : undefined,
+            distributorType:    saleType === 'B2B' ? req.body.distributorType : undefined,
+            paymentMode:        req.body.paymentMode || 'CASH',
+            isRepeatOrder:      req.body.isRepeatOrder === 'true' || req.body.isRepeatOrder === true,
+            village: req.body.village, district: req.body.district, state: req.body.state,
+            location, photos: [], notes: req.body.notes
+        })
+        console.log("[SALE] DB saved, id:", sale._id)
+
+        res.json(sale)
+        console.log("[SALE] Response sent")
+
+        // ── Fire-and-forget ───────────────────────────────────────────────
+        uploadFiles(req.files).then(photoUrls => {
+            if (photoUrls.length > 0) {
+                Sale.findByIdAndUpdate(sale._id, { photos: photoUrls }).catch(e => console.error("[SALE] Photo URL update error:", e.message))
+            }
+        }).catch(e => console.error("[SALE] Cloudinary upload error:", e.message))
+
+        if (sale.location?.lat) {
+            LocationLog.create({ userId: req.user.id, location: sale.location, activity: 'SALE' })
+                .catch(e => console.error("[SALE] Location log error:", e.message))
+        }
+
+        User.findById(req.user.id).select('name phone').lean().then(officer => {
+            AdminMessage.create({
+                officerId: req.user.id,
+                officerName: officer?.name || 'Field Officer',
+                officerPhone: officer?.phone || '',
+                text: `New ${saleType} Sale: ${quantity}x ${req.body.productName} (₹${totalAmount}) to ${customerName}`,
+                location, distanceTravelled: 0, status: 'SALE', timestamp: new Date()
+            }).catch(e => console.error("[SALE] Admin message error:", e.message))
+        }).catch(e => console.error("[SALE] Officer lookup error:", e.message))
 
         const today = new Date(); today.setHours(0, 0, 0, 0)
         AnalyticsSummary.findOneAndUpdate(
             { userId: req.user.id, date: today },
-            { $inc: { salesCount: 1, totalSalesAmount: sale.totalAmount || 0, b2cSales: sale.saleType === 'B2C' ? 1 : 0, b2bSales: sale.saleType === 'B2B' ? 1 : 0 } },
+            { $inc: { salesCount: 1, totalSalesAmount: totalAmount, b2cSales: saleType === 'B2C' ? 1 : 0, b2bSales: saleType === 'B2B' ? 1 : 0 } },
             { upsert: true }
-        ).catch(err => console.error("Failed to update sales stats:", err))
+        ).catch(err => console.error("[SALE] Analytics update error:", err))
 
-        res.json(sale)
     } catch (err) {
-        console.error("Sale logging error:", err)
-        res.status(500).json({ error: "Failed to log sale: " + err.message })
+        console.error("[SALE] Error in catch block:", err.message, err.stack)
+        if (!res.headersSent) res.status(500).json({ error: "Failed to log sale: " + err.message })
     }
 }
 

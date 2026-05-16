@@ -32,11 +32,23 @@ export const LocationTrack = mongoose.model("LocationTrack", LocationTrackSchema
 export async function connectDB() {
     const uri = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/occamy"
     await mongoose.connect(uri, {
-        serverSelectionTimeoutMS: 30000,
-        socketTimeoutMS: 45000
+        maxPoolSize: 20,
+        serverSelectionTimeoutMS: 15000,
+        socketTimeoutMS: 45000,
+        connectTimeoutMS: 15000,
+        heartbeatFrequencyMS: 10000,
+        retryWrites: true,
+        retryReads: true,
     })
-    console.log("MongoDB connected to", uri)
+    console.log("✅ MongoDB connected")
 }
+
+mongoose.connection.on("disconnected", () => {
+    console.warn("⚠ MongoDB disconnected — Mongoose will auto-reconnect")
+})
+mongoose.connection.on("error", (err) => {
+    console.error("MongoDB error:", err.message)
+})
 
 
 
@@ -105,7 +117,7 @@ export const Activity = mongoose.model(
             // Person details (for ONE_TO_ONE)
             personName: String,
             contactNumber: String,
-            category: { type: String, enum: ["FARMER", "SELLER", "INFLUENCER", "VETERINARIAN", "DAIRY_COLLECTION_CENTER", "RETAIL_OUTLET", "KVK", "FPO", "DISTRIBUTOR", "DEALER"] },
+            category: { type: String, enum: ["FARMER", "SELLER", "INFLUENCER", "VETERINARIAN", "DAIRY_COLLECTION_CENTER", "RETAIL_OUTLET", "KVK", "FPO", "DISTRIBUTOR", "DEALER", "DDB"] },
 
             // Business potential
             businessPotential: {

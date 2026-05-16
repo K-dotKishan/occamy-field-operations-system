@@ -6,6 +6,24 @@ import L from "leaflet"
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000"
 
+// ─── GPS helper ───────────────────────────────────────────────────────────────
+// Always resolves — never rejects. Falls back to {lat:0,lng:0} if GPS times
+// out or is unavailable so forms always submit regardless of GPS state.
+function getLocation() {
+  return new Promise((resolve) => {
+    if (!navigator.geolocation) return resolve({ lat: 0, lng: 0, accuracy: 0 })
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+        accuracy: pos.coords.accuracy
+      }),
+      () => resolve({ lat: 0, lng: 0, accuracy: 0 }),
+      { timeout: 5000, maximumAge: 60000, enableHighAccuracy: false }
+    )
+  })
+}
+
 /* Fix leaflet marker */
 delete L.Icon.Default.prototype._getIconUrl
 L.Icon.Default.mergeOptions({
@@ -510,26 +528,15 @@ export default function Dashboard() {
 
   /* ================= FIELD: START DAY ================= */
   const startDay = async () => {
-    if (!navigator.geolocation) {
-      showNotification("error", "Geolocation not supported")
-      return
-    }
-
     // setPulseAnimation(true) - Removed to prevent notification obscuring
 
     try {
-      const position = await new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          timeout: 15000,
-          maximumAge: 10000
-        })
-      })
+      const position = await getLocation()
 
       const coords = {
-        lat: position.coords.latitude,
-        lng: position.coords.longitude,
-        accuracy: position.coords.accuracy
+        lat: position.lat,
+        lng: position.lng,
+        accuracy: position.accuracy
       }
 
       setLocation(coords)
@@ -565,25 +572,14 @@ export default function Dashboard() {
   const endDay = async () => {
     if (!window.confirm("Are you sure you want to end your day? This cannot be undone.")) return
 
-    if (!navigator.geolocation) {
-      showNotification("error", "Geolocation not supported")
-      return
-    }
-
     setIsEndingDay(true)
 
     try {
-      const position = await new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          timeout: 15000,
-          maximumAge: 10000
-        })
-      })
+      const position = await getLocation()
 
       const coords = {
-        lat: position.coords.latitude,
-        lng: position.coords.longitude
+        lat: position.lat,
+        lng: position.lng
       }
 
       // End attendance — backend saves final distance into the Attendance doc (dailyLog)
@@ -2846,20 +2842,10 @@ function EnhancedFieldMeetingOne({ onClose }) {
       return
     }
 
-    if (!navigator.geolocation) {
-      showNotification("error", "Geolocation not supported")
-      return
-    }
-
     setLoading(true)
 
     try {
-      const position = await new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          timeout: 10000
-        })
-      })
+      const position = await getLocation()
 
       // Upload photo if exists
       let photoUrl = ""
@@ -2873,9 +2859,9 @@ function EnhancedFieldMeetingOne({ onClose }) {
         personName: personName.trim(),
         contactNumber: phone.trim() || undefined,
         location: {
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-          accuracy: position.coords.accuracy
+          lat: position.lat,
+          lng: position.lng,
+          accuracy: position.accuracy
         },
         notes: notes.trim() || undefined,
         photoUrl: photoUrl || undefined,
@@ -3245,19 +3231,10 @@ function EnhancedFieldMeetingGroup({ onClose }) {
       showNotification("error", "Please enter number of attendees")
       return
     }
-    if (!navigator.geolocation) {
-      showNotification("error", "Geolocation not supported")
-      return
-    }
 
     setLoading(true)
     try {
-      const position = await new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          timeout: 10000
-        })
-      })
+      const position = await getLocation()
 
       let photoUrl = ""
       if (photo) { photoUrl = await uploadPhoto() }
@@ -3271,9 +3248,9 @@ function EnhancedFieldMeetingGroup({ onClose }) {
         // Entity name for institutional categories
         entityName: ENTITY_CATEGORIES.includes(category) ? (entityName.trim() || undefined) : undefined,
         location: {
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-          accuracy: position.coords.accuracy
+          lat: position.lat,
+          lng: position.lng,
+          accuracy: position.accuracy
         },
         photoUrl: photoUrl || undefined,
         timestamp: new Date().toISOString(),
@@ -3552,20 +3529,10 @@ function EnhancedSaleForm({ onClose }) {
       return
     }
 
-    if (!navigator.geolocation) {
-      showNotification("error", "Geolocation not supported")
-      return
-    }
-
     setLoading(true)
 
     try {
-      const position = await new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          timeout: 20000
-        })
-      })
+      const position = await getLocation()
 
       // Upload photo if exists
       let photoUrl = ""
@@ -3577,9 +3544,9 @@ function EnhancedSaleForm({ onClose }) {
         ...formData,
         totalAmount,
         location: {
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-          accuracy: position.coords.accuracy
+          lat: position.lat,
+          lng: position.lng,
+          accuracy: position.accuracy
         },
         photoUrl: photoUrl || undefined,
         timestamp: new Date().toISOString()

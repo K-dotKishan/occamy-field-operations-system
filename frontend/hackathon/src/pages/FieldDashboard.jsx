@@ -5,6 +5,21 @@ import { MapPin, Users, Package, TrendingUp, Calendar, Camera, X, Upload, Wifi, 
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000"
 
+// ─── GPS helper ───────────────────────────────────────────────────────────────
+// Tries to get the device location with a 5-second timeout.
+// If GPS is unavailable or times out, resolves with {lat:0, lng:0} so forms
+// always submit — location is optional metadata, not a blocker.
+function getLocation() {
+  return new Promise((resolve) => {
+    if (!navigator.geolocation) return resolve({ lat: 0, lng: 0 })
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      ()    => resolve({ lat: 0, lng: 0 }),
+      { timeout: 5000, maximumAge: 60000, enableHighAccuracy: false }
+    )
+  })
+}
+
 export default function FieldDashboard() {
   const [location, setLocation] = useState(null)
   const [activeDay, setActiveDay] = useState(null)
@@ -73,69 +88,43 @@ export default function FieldDashboard() {
     }
   }
 
-  const startDay = () => {
-    if (!navigator.geolocation) {
-      alert("Geolocation not supported")
-      return
-    }
-
+  const startDay = async () => {
     const odometer = prompt("Enter starting odometer reading (km):")
     if (!odometer) return
 
-    navigator.geolocation.getCurrentPosition(
-      async pos => {
-        const coords = {
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude
-        }
-        setLocation(coords)
+    const coords = await getLocation()
+    setLocation(coords)
 
-        try {
-          await api("/field/attendance/start", "POST", {
-            location: coords,
-            odometer: parseFloat(odometer)
-          })
-          alert("Day started successfully!")
-          setActiveDay(true)
-          loadSummary()
-        } catch (err) {
-          alert("Failed to start day")
-        }
-      },
-      () => alert("Location permission denied")
-    )
+    try {
+      await api("/field/attendance/start", "POST", {
+        location: coords,
+        odometer: parseFloat(odometer)
+      })
+      alert("Day started successfully!")
+      setActiveDay(true)
+      loadSummary()
+    } catch (err) {
+      alert("Failed to start day: " + (err?.error || err?.message || "Unknown error"))
+    }
   }
 
-  const endDay = () => {
-    if (!navigator.geolocation) {
-      alert("Geolocation not supported")
-      return
-    }
-
+  const endDay = async () => {
     const odometer = prompt("Enter ending odometer reading (km):")
     if (!odometer) return
 
-    navigator.geolocation.getCurrentPosition(
-      async pos => {
-        const coords = {
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude
-        }
+    const coords = await getLocation()
 
-        try {
-          await api("/field/attendance/end", "POST", {
-            location: coords,
-            odometer: parseFloat(odometer)
-          })
-          alert("Day ended successfully!")
-          setActiveDay(false)
-          loadSummary()
-        } catch (err) {
-          alert("Failed to end day")
-        }
-      },
-      () => alert("Location permission denied")
-    )
+    try {
+      await api("/field/attendance/end", "POST", {
+        location: coords,
+        odometer: parseFloat(odometer)
+      })
+      alert("Day ended successfully!")
+      setActiveDay(false)
+      loadSummary()
+    } catch (err) {
+      alert("Failed to end day: " + (err?.error || err?.message || "Unknown error"))
+    }
   }
 
   return (
@@ -294,66 +283,62 @@ function MeetingForm({ onClose }) {
   })
   const [photos, setPhotos] = useState([])
 
-  const handleSubmit = () => {
-    if (!navigator.geolocation) {
-      alert("Geolocation not supported")
-      return
+  const handleSubmit = async () => {
+    const location = await getLocation()
+    const formDataToSend = new FormData()
+
+    formDataToSend.append('location', JSON.stringify(location))
+
+    if (meetingType === "ONE_TO_ONE") {
+      // Only send ONE_TO_ONE relevant fields
+      formDataToSend.append('personName',      formData.personName)
+      formDataToSend.append('contactNumber',   formData.contactNumber)
+      formDataToSend.append('category',        formData.category)
+      formDataToSend.append('village',         formData.village)
+      formDataToSend.append('district',        formData.district)
+      formDataToSend.append('state',           formData.state)
+      formDataToSend.append('notes',           formData.notes)
+      formDataToSend.append('followUpRequired', String(formData.followUpRequired))
+      formDataToSend.append('businessPotential', JSON.stringify({
+        estimatedVolume: formData.estimatedVolume,
+        likelihood: formData.likelihood
+      }))
+    } else {
+      // Only send GROUP relevant fields
+      formDataToSend.append('village',         formData.village)
+      formDataToSend.append('district',        formData.district)
+      formDataToSend.append('state',           formData.state)
+      formDataToSend.append('attendeesCount',  formData.attendeesCount)
+      formDataToSend.append('meetingType',     formData.meetingType)
+      formDataToSend.append('category',        formData.category)
+      formDataToSend.append('notes',           formData.notes)
     }
 
-    navigator.geolocation.getCurrentPosition(
-      async pos => {
-        const formDataToSend = new FormData()
+    // Add photos
+    photos.forEach(photo => {
+      formDataToSend.append('photos', photo)
+    })
 
-        const location = {
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude
-        }
+    try {
+      const endpoint = meetingType === "ONE_TO_ONE"
+        ? "/field/meeting/one-to-one"
+        : "/field/meeting/group"
 
-        // Add location
-        formDataToSend.append('location', JSON.stringify(location))
+      const res = await fetch(`${API_URL}${endpoint}`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+        body: formDataToSend
+      })
 
-        // Add form fields based on meeting type
-        Object.keys(formData).forEach(key => {
-          if (meetingType === "ONE_TO_ONE" && key.startsWith('meeting')) return
-          if (meetingType === "GROUP" && (key === 'personName' || key === 'contactNumber')) return
-          formDataToSend.append(key, formData[key])
-        })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || `Server error ${res.status}`)
 
-        // Add business potential for one-to-one
-        if (meetingType === "ONE_TO_ONE") {
-          formDataToSend.append('businessPotential', JSON.stringify({
-            estimatedVolume: formData.estimatedVolume,
-            likelihood: formData.likelihood
-          }))
-        }
-
-        // Add photos
-        photos.forEach(photo => {
-          formDataToSend.append('photos', photo)
-        })
-
-        try {
-          const endpoint = meetingType === "ONE_TO_ONE"
-            ? "/field/meeting/one-to-one"
-            : "/field/meeting/group"
-
-          await fetch(`${API_URL}${endpoint}`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${localStorage.getItem('token')}`
-            },
-            body: formDataToSend
-          })
-
-          alert("Meeting logged successfully!")
-          onClose()
-        } catch (err) {
-          console.error("Meeting log error:", err)
-          alert("Failed to log meeting: " + (err.message || "Unknown error"))
-        }
-      },
-      () => alert("Location permission denied")
-    )
+      alert("Meeting logged successfully!")
+      onClose()
+    } catch (err) {
+      console.error("Meeting log error:", err)
+      alert("Failed to log meeting: " + (err.message || "Unknown error"))
+    }
   }
 
   return (
@@ -461,49 +446,36 @@ function SampleForm({ onClose }) {
   })
   const [photos, setPhotos] = useState([])
 
-  const handleSubmit = () => {
-    if (!navigator.geolocation) {
-      alert("Geolocation not supported")
-      return
+  const handleSubmit = async () => {
+    const location = await getLocation()
+    const formDataToSend = new FormData()
+
+    formDataToSend.append('location', JSON.stringify(location))
+
+    Object.keys(formData).forEach(key => {
+      formDataToSend.append(key, formData[key])
+    })
+
+    photos.forEach(photo => {
+      formDataToSend.append('photos', photo)
+    })
+
+    try {
+      const res = await fetch(`${API_URL}/field/sample`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+        body: formDataToSend
+      })
+
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || `Server error ${res.status}`)
+
+      alert("Sample distribution logged!")
+      onClose()
+    } catch (err) {
+      console.error("Sample log error:", err)
+      alert("Failed to log sample: " + (err.message || "Unknown error"))
     }
-
-    navigator.geolocation.getCurrentPosition(
-      async pos => {
-        const formDataToSend = new FormData()
-
-        const location = {
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude
-        }
-
-        formDataToSend.append('location', JSON.stringify(location))
-
-        Object.keys(formData).forEach(key => {
-          formDataToSend.append(key, formData[key])
-        })
-
-        photos.forEach(photo => {
-          formDataToSend.append('photos', photo)
-        })
-
-        try {
-          await fetch(`${API_URL}/field/sample`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${localStorage.getItem('token')}`
-            },
-            body: formDataToSend
-          })
-
-          alert("Sample distribution logged!")
-          onClose()
-        } catch (err) {
-          console.error("Sample log error:", err)
-          alert("Failed to log sample: " + (err.message || "Unknown error"))
-        }
-      },
-      () => alert("Location permission denied")
-    )
   }
 
   return (
@@ -571,50 +543,40 @@ function SaleForm({ onClose }) {
 
   const totalAmount = formData.quantity * formData.pricePerUnit
 
-  const handleSubmit = () => {
-    if (!navigator.geolocation) {
-      alert("Geolocation not supported")
-      return
+  const handleSubmit = async () => {
+    const location = await getLocation()
+    const formDataToSend = new FormData()
+
+    formDataToSend.append('location', JSON.stringify(location))
+    formDataToSend.append('saleType', saleType)
+
+    Object.keys(formData).forEach(key => {
+      formDataToSend.append(key, formData[key])
+    })
+
+    // totalAmount is derived — not in formData, must be appended explicitly
+    formDataToSend.append('totalAmount', totalAmount)
+
+    photos.forEach(photo => {
+      formDataToSend.append('photos', photo)
+    })
+
+    try {
+      const res = await fetch(`${API_URL}/field/sale`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+        body: formDataToSend
+      })
+
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || `Server error ${res.status}`)
+
+      alert("Sale recorded successfully!")
+      onClose()
+    } catch (err) {
+      console.error("Sale log error:", err)
+      alert("Failed to record sale: " + (err.message || "Unknown error"))
     }
-
-    navigator.geolocation.getCurrentPosition(
-      async pos => {
-        const formDataToSend = new FormData()
-
-        const location = {
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude
-        }
-
-        formDataToSend.append('location', JSON.stringify(location))
-        formDataToSend.append('saleType', saleType)
-
-        Object.keys(formData).forEach(key => {
-          formDataToSend.append(key, formData[key])
-        })
-
-        photos.forEach(photo => {
-          formDataToSend.append('photos', photo)
-        })
-
-        try {
-          await fetch(`${API_URL}/field/sale`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${localStorage.getItem('token')}`
-            },
-            body: formDataToSend
-          })
-
-          alert("Sale recorded successfully!")
-          onClose()
-        } catch (err) {
-          console.error("Sale log error:", err)
-          alert("Failed to record sale: " + (err.message || "Unknown error"))
-        }
-      },
-      () => alert("Location permission denied")
-    )
   }
 
   return (
@@ -780,62 +742,45 @@ function MessageToAdminForm({ onClose, currentSummary }) {
   const [messageType, setMessageType] = useState("UPDATE")
   const [isLoading, setIsLoading] = useState(false)
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!messageText.trim()) {
       alert("Please enter a message")
       return
     }
 
-    if (!navigator.geolocation) {
-      alert("Geolocation not supported")
-      return
+    const location = await getLocation()
+    const distanceTravelled = currentSummary?.distanceTraveled || 0
+
+    const messageData = {
+      text: messageText,
+      location,
+      distanceTravelled,
+      status: messageType,
+      timestamp: new Date()
     }
 
-    navigator.geolocation.getCurrentPosition(
-      async pos => {
-        const location = {
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          address: "" // Can be enhanced with reverse geocoding
-        }
+    try {
+      setIsLoading(true)
+      const response = await fetch(`${API_URL}/admin/messages`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("token")}`
+        },
+        body: JSON.stringify(messageData)
+      })
 
-        const distanceTravelled = currentSummary?.distanceTraveled || 0
+      if (!response.ok) throw new Error("Failed to send message")
 
-        const messageData = {
-          text: messageText,
-          location,
-          distanceTravelled,
-          status: messageType,
-          timestamp: new Date()
-        }
-
-        try {
-          setIsLoading(true)
-          const response = await fetch(`${API_URL}/admin/messages`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${localStorage.getItem("token")}`
-            },
-            body: JSON.stringify(messageData)
-          })
-
-          if (!response.ok) {
-            throw new Error("Failed to send message")
-          }
-
-          alert("Message sent to admin successfully!")
-          setMessageText("")
-          onClose()
-        } catch (err) {
-          console.error("Error sending message:", err)
-          alert("Failed to send message. Please try again.")
-        } finally {
-          setIsLoading(false)
-        }
-      },
-      () => alert("Location permission denied")
-    )
+      alert("Message sent to admin successfully!")
+      setMessageText("")
+      onClose()
+    } catch (err) {
+      console.error("Error sending message:", err)
+      alert("Failed to send message. Please try again.")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
