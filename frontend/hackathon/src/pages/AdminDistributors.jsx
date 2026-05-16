@@ -114,10 +114,10 @@ export default function AdminDistributors() {
               <ArrowLeft size={16} /> Back
             </button>
             <div style={{ width: 1, height: 28, background: "rgba(255,255,255,.2)" }} />
-            <div style={{ width: 38, height: 38, borderRadius: 9, overflow: "hidden", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <div style={{ width: 38, height: 38, borderRadius: 9, overflow: "hidden", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <img src={occamyLogo} alt="Occamy" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
             </div>
-            <div>
+            <div className="dist-brand">
               <div style={{ color: "#fff", fontWeight: 900, fontSize: 14, lineHeight: 1.1 }}>OCCAMY BIOSCIENCE</div>
               <div style={{ color: "rgba(255,255,255,.65)", fontSize: 10, fontWeight: 500 }}>Distributor Control Center</div>
             </div>
@@ -139,15 +139,15 @@ export default function AdminDistributors() {
       </nav>
 
       {/* MAIN */}
-      <main style={{ maxWidth: 1280, margin: "0 auto", padding: "88px 16px 48px" }}>
+      <main style={{ maxWidth: 1280, margin: "0 auto", padding: "100px 16px 48px" }}>
 
         {/* Page title */}
-        <div style={{ marginBottom: 28 }}>
-          <h1 style={{ fontSize: 28, fontWeight: 900, color: "#3E3E5C", margin: 0 }}>
+        <div style={{ marginBottom: 24 }}>
+          <h1 style={{ fontSize: "clamp(18px, 5vw, 28px)", fontWeight: 800, color: "#3E3E5C", margin: 0, lineHeight: 1.2 }}>
             Distributor Control Center
           </h1>
           <p style={{ color: "#7A7490", fontSize: 13, margin: "4px 0 0" }}>
-            Real-time fleet tracking, sales monitoring and inventory management
+            Real-time sales monitoring and inventory management
           </p>
         </div>
 
@@ -235,10 +235,10 @@ export default function AdminDistributors() {
               </button>
             </div>
 
-            {/* DATA TABLE */}
+            {/* DATA TABLE — scrollable on mobile */}
             <div style={{ background: "#fff", borderRadius: 20, boxShadow: "0 4px 24px rgba(62,62,92,.1)", overflow: "hidden", border: "1px solid #e0e7ff" }}>
               {/* Table header bar */}
-              <div style={{ background: "linear-gradient(135deg, #eef2ff 0%, #f5f3ff 100%)", padding: "16px 20px", borderBottom: "1px solid #e0e7ff", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ background: "linear-gradient(135deg, #eef2ff 0%, #f5f3ff 100%)", padding: "14px 16px", borderBottom: "1px solid #e0e7ff", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <div style={{ background: "#6366f1", borderRadius: 8, padding: "6px 8px", display: "flex" }}><Users size={16} color="#fff" /></div>
                   <span style={{ fontWeight: 800, color: "#3E3E5C", fontSize: 15 }}>Distributor Fleet</span>
@@ -247,80 +247,78 @@ export default function AdminDistributors() {
                 {autoRefresh && (
                   <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#16a34a", fontWeight: 700 }}>
                     <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#22c55e", display: "inline-block" }} />
-                    Auto-refreshing every 10s
+                    Auto-refreshing
                   </span>
                 )}
               </div>
 
-              {/* Column headers */}
-              <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1.2fr", gap: 8, padding: "10px 20px", background: "#f9fafb", borderBottom: "1px solid #f3f4f6", fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: .5 }}>
-                <div>Distributor</div>
-                <div>Today Revenue</div>
-                <div>Stock Level</div>
-                <div>Actions</div>
+              {/* Scrollable table wrapper */}
+              <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+                <div style={{ minWidth: 520 }}>
+                  {/* Column headers */}
+                  <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1.2fr", gap: 8, padding: "10px 16px", background: "#f9fafb", borderBottom: "1px solid #f3f4f6", fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: .5 }}>
+                    <div>Distributor</div>
+                    <div>Revenue</div>
+                    <div>Stock</div>
+                    <div>Actions</div>
+                  </div>
+
+                  {filtered.length === 0 && (
+                    <div style={{ padding: "48px 20px", textAlign: "center" }}>
+                      <div style={{ fontSize: 40, marginBottom: 12 }}>🏪</div>
+                      <p style={{ color: "#7A7490", fontWeight: 600, fontSize: 14 }}>
+                        {search ? `No distributors match "${search}"` : "No distributors registered yet"}
+                      </p>
+                    </div>
+                  )}
+
+                  {filtered.map((d, idx) => (
+                    <div key={d._id} style={{
+                      display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1.2fr",
+                      gap: 8, padding: "12px 16px", borderBottom: "1px solid #f3f4f6",
+                      background: idx % 2 === 0 ? "#fff" : "#fafafa",
+                      alignItems: "center", transition: "background .15s"
+                    }}
+                      onMouseEnter={e => e.currentTarget.style.background = "#eef2ff"}
+                      onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? "#fff" : "#fafafa"}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <div style={{
+                          width: 36, height: 36, borderRadius: "50%", flexShrink: 0,
+                          background: d.isActive ? "linear-gradient(135deg,#22c55e,#16a34a)" : "linear-gradient(135deg,#9ca3af,#6b7280)",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          color: "#fff", fontWeight: 900, fontSize: 14
+                        }}>
+                          {d.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontWeight: 700, color: "#3E3E5C", fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.name}</div>
+                          <div style={{ fontSize: 11, color: "#7A7490", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.phone || d.email}</div>
+                          {(d.state || d.district) && (
+                            <div style={{ fontSize: 10, color: "#9ca3af" }}>{[d.district, d.state].filter(Boolean).join(", ")}</div>
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 900, fontSize: 14, color: "#0d9488" }}>{fmtMoney(d.todayRevenue)}</div>
+                        <div style={{ fontSize: 10, color: "#9ca3af" }}>{d.todaySalesCount || 0} sale{d.todaySalesCount !== 1 ? "s" : ""}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 900, fontSize: 14, color: d.totalStock > 0 ? "#9333ea" : "#ef4444" }}>
+                          {d.totalStock ?? 0} units
+                        </div>
+                        <div style={{ fontSize: 10, color: "#9ca3af" }}>{d.productCount || 0} product{d.productCount !== 1 ? "s" : ""}</div>
+                      </div>
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        <button onClick={() => openDetail(d)}
+                          style={{ background: "#6366f1", color: "#fff", border: "none", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontFamily: "Poppins, sans-serif", fontWeight: 700, fontSize: 11 }}>
+                          View Details
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
-
-              {filtered.length === 0 && (
-                <div style={{ padding: "48px 20px", textAlign: "center" }}>
-                  <div style={{ fontSize: 40, marginBottom: 12 }}>🏪</div>
-                  <p style={{ color: "#7A7490", fontWeight: 600, fontSize: 14 }}>
-                    {search ? `No distributors match "${search}"` : "No distributors registered yet"}
-                  </p>
-                </div>
-              )}
-
-              {filtered.map((d, idx) => (
-                <div key={d._id} style={{
-                  display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1.2fr",
-                  gap: 8, padding: "14px 20px", borderBottom: "1px solid #f3f4f6",
-                  background: idx % 2 === 0 ? "#fff" : "#fafafa",
-                  alignItems: "center", transition: "background .15s"
-                }}
-                  onMouseEnter={e => e.currentTarget.style.background = "#eef2ff"}
-                  onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? "#fff" : "#fafafa"}
-                >
-                  {/* Name */}
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <div style={{
-                      width: 36, height: 36, borderRadius: "50%", flexShrink: 0,
-                      background: d.isActive ? "linear-gradient(135deg,#22c55e,#16a34a)" : "linear-gradient(135deg,#9ca3af,#6b7280)",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      color: "#fff", fontWeight: 900, fontSize: 14
-                    }}>
-                      {d.name.charAt(0).toUpperCase()}
-                    </div>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, color: "#3E3E5C", fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.name}</div>
-                      <div style={{ fontSize: 11, color: "#7A7490", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.phone || d.email}</div>
-                      {(d.state || d.district) && (
-                        <div style={{ fontSize: 10, color: "#9ca3af" }}>{[d.district, d.state].filter(Boolean).join(", ")}</div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Revenue */}
-                  <div>
-                    <div style={{ fontWeight: 900, fontSize: 14, color: "#0d9488" }}>{fmtMoney(d.todayRevenue)}</div>
-                    <div style={{ fontSize: 10, color: "#9ca3af" }}>{d.todaySalesCount || 0} sale{d.todaySalesCount !== 1 ? "s" : ""}</div>
-                  </div>
-
-                  {/* Stock */}
-                  <div>
-                    <div style={{ fontWeight: 900, fontSize: 14, color: d.totalStock > 0 ? "#9333ea" : "#ef4444" }}>
-                      {d.totalStock ?? 0} units
-                    </div>
-                    <div style={{ fontSize: 10, color: "#9ca3af" }}>{d.productCount || 0} product{d.productCount !== 1 ? "s" : ""}</div>
-                  </div>
-
-                  {/* Actions */}
-                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                    <button onClick={() => openDetail(d)}
-                      style={{ background: "#6366f1", color: "#fff", border: "none", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontFamily: "Poppins, sans-serif", fontWeight: 700, fontSize: 11 }}>
-                      View Details
-                    </button>
-                  </div>
-                </div>
-              ))}
             </div>
           </>
         )}
@@ -333,21 +331,21 @@ export default function AdminDistributors() {
           <div style={{ background: "#fff", borderRadius: 24, boxShadow: "0 24px 80px rgba(0,0,0,.2)", width: "100%", maxWidth: 640, maxHeight: "85vh", overflowY: "auto" }}
             onClick={e => e.stopPropagation()}>
             {/* Modal header */}
-            <div style={{ background: "linear-gradient(135deg, #6366f1 0%, #9333ea 100%)", padding: "24px 28px", borderRadius: "24px 24px 0 0", color: "#fff" }}>
+            <div style={{ background: "linear-gradient(135deg, #6366f1 0%, #9333ea 100%)", padding: "20px 16px", borderRadius: "24px 24px 0 0", color: "#fff" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: 20, fontWeight: 900 }}>{selectedDist.name}</h3>
-                  <p style={{ margin: "4px 0 0", fontSize: 13, color: "rgba(255,255,255,.7)" }}>{selectedDist.phone} • {selectedDist.email}</p>
-                  <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-                    <span style={{ padding: "3px 12px", borderRadius: 20, fontSize: 11, fontWeight: 700, background: selectedDist.isActive ? "rgba(34,197,94,.3)" : "rgba(255,255,255,.2)", color: selectedDist.isActive ? "#bbf7d0" : "rgba(255,255,255,.7)" }}>
+                <div style={{ flex: 1, minWidth: 0, paddingRight: 12 }}>
+                  <h3 style={{ margin: 0, fontSize: "clamp(16px, 4vw, 20px)", fontWeight: 900 }}>{selectedDist.name}</h3>
+                  <p style={{ margin: "4px 0 0", fontSize: 12, color: "rgba(255,255,255,.7)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{selectedDist.phone} • {selectedDist.email}</p>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
+                    <span style={{ padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700, background: selectedDist.isActive ? "rgba(34,197,94,.3)" : "rgba(255,255,255,.2)", color: selectedDist.isActive ? "#bbf7d0" : "rgba(255,255,255,.7)" }}>
                       {selectedDist.isActive ? "🟢 GPS Active" : "⚫ Offline"}
                     </span>
-                    <span style={{ padding: "3px 12px", borderRadius: 20, fontSize: 11, fontWeight: 700, background: "rgba(255,255,255,.2)", color: "#fff" }}>
+                    <span style={{ padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700, background: "rgba(255,255,255,.2)", color: "#fff" }}>
                       📏 {fmtDist(selectedDist.totalDistance)} km today
                     </span>
                   </div>
                 </div>
-                <button onClick={() => setSelectedDist(null)} style={{ background: "rgba(255,255,255,.2)", border: "none", borderRadius: "50%", width: 32, height: 32, cursor: "pointer", color: "#fff", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+                <button onClick={() => setSelectedDist(null)} style={{ background: "rgba(255,255,255,.2)", border: "none", borderRadius: "50%", width: 32, height: 32, cursor: "pointer", color: "#fff", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>✕</button>
               </div>
             </div>
 
@@ -358,23 +356,23 @@ export default function AdminDistributors() {
                 { label: "Units in Stock", value: selectedDist.totalStock ?? 0, color: "#9333ea" },
                 { label: "Sales Today",   value: selectedDist.todaySalesCount ?? 0, color: "#f97316" },
               ].map(k => (
-                <div key={k.label} style={{ padding: "18px 16px", textAlign: "center" }}>
-                  <div style={{ fontSize: 22, fontWeight: 900, color: k.color }}>{k.value}</div>
-                  <div style={{ fontSize: 11, color: "#7A7490", marginTop: 4 }}>{k.label}</div>
+                <div key={k.label} style={{ padding: "14px 10px", textAlign: "center" }}>
+                  <div style={{ fontSize: "clamp(16px, 4vw, 22px)", fontWeight: 900, color: k.color }}>{k.value}</div>
+                  <div style={{ fontSize: 10, color: "#7A7490", marginTop: 4 }}>{k.label}</div>
                 </div>
               ))}
             </div>
 
             {/* Sales history */}
-            <div style={{ padding: "20px 24px" }}>
+            <div style={{ padding: "16px 16px" }}>
 
               {/* Daily Sales Bar Chart */}
               {!salesLoading && distAnalytics?.dailyChart?.length > 0 && (
-                <div style={{ marginBottom: 24 }}>
-                  <h4 style={{ margin: "0 0 12px", color: "#3E3E5C", fontWeight: 800, fontSize: 15, display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ marginBottom: 20 }}>
+                  <h4 style={{ margin: "0 0 12px", color: "#3E3E5C", fontWeight: 800, fontSize: 14, display: "flex", alignItems: "center", gap: 8 }}>
                     <BarChart3 size={16} color="#6366f1" /> Daily Sales — Last 30 Days
                   </h4>
-                  <ResponsiveContainer width="100%" height={180}>
+                  <ResponsiveContainer width="100%" height={160}>
                     <BarChart data={distAnalytics.dailyChart} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
                       <XAxis dataKey="date" tick={{ fontSize: 9 }} tickFormatter={d => d.slice(5)} />
@@ -389,28 +387,28 @@ export default function AdminDistributors() {
                 </div>
               )}
 
-              {/* Inventory Summary — Received / Sold / Remaining */}
+              {/* Inventory Summary */}
               {!salesLoading && distAnalytics?.inventorySummary?.length > 0 && (
-                <div style={{ marginBottom: 24 }}>
-                  <h4 style={{ margin: "0 0 12px", color: "#3E3E5C", fontWeight: 800, fontSize: 15, display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ marginBottom: 20 }}>
+                  <h4 style={{ margin: "0 0 12px", color: "#3E3E5C", fontWeight: 800, fontSize: 14, display: "flex", alignItems: "center", gap: 8 }}>
                     <Package size={16} color="#9333ea" /> Stock Level (Received − Sold)
                   </h4>
-                  <div style={{ overflowX: "auto" }}>
-                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                  <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, minWidth: 320 }}>
                       <thead>
                         <tr style={{ background: "#f9fafb" }}>
                           {["Product", "Received", "Sold", "Remaining"].map(h => (
-                            <th key={h} style={{ padding: "8px 12px", textAlign: "left", fontWeight: 700, color: "#6b7280", fontSize: 11, textTransform: "uppercase", letterSpacing: .4, borderBottom: "1px solid #f3f4f6" }}>{h}</th>
+                            <th key={h} style={{ padding: "8px 10px", textAlign: "left", fontWeight: 700, color: "#6b7280", fontSize: 10, textTransform: "uppercase", letterSpacing: .4, borderBottom: "1px solid #f3f4f6" }}>{h}</th>
                           ))}
                         </tr>
                       </thead>
                       <tbody>
                         {distAnalytics.inventorySummary.map((item, i) => (
                           <tr key={i} style={{ borderBottom: "1px solid #f9fafb" }}>
-                            <td style={{ padding: "10px 12px", fontWeight: 600, color: "#3E3E5C" }}>{item.productName}{item.packSize ? ` (${item.packSize})` : ""}</td>
-                            <td style={{ padding: "10px 12px", color: "#0d9488", fontWeight: 700 }}>{item.quantityReceived}</td>
-                            <td style={{ padding: "10px 12px", color: "#f97316", fontWeight: 700 }}>{item.quantityDistributed}</td>
-                            <td style={{ padding: "10px 12px", fontWeight: 900, color: item.currentStock > 0 ? "#9333ea" : "#ef4444" }}>{item.currentStock}</td>
+                            <td style={{ padding: "8px 10px", fontWeight: 600, color: "#3E3E5C", fontSize: 12 }}>{item.productName}{item.packSize ? ` (${item.packSize})` : ""}</td>
+                            <td style={{ padding: "8px 10px", color: "#0d9488", fontWeight: 700 }}>{item.quantityReceived}</td>
+                            <td style={{ padding: "8px 10px", color: "#f97316", fontWeight: 700 }}>{item.quantityDistributed}</td>
+                            <td style={{ padding: "8px 10px", fontWeight: 900, color: item.currentStock > 0 ? "#9333ea" : "#ef4444" }}>{item.currentStock}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -420,7 +418,7 @@ export default function AdminDistributors() {
               )}
 
               {/* Recent Sales List */}
-              <h4 style={{ margin: "0 0 12px", color: "#3E3E5C", fontWeight: 800, fontSize: 15, display: "flex", alignItems: "center", gap: 8 }}>
+              <h4 style={{ margin: "0 0 12px", color: "#3E3E5C", fontWeight: 800, fontSize: 14, display: "flex", alignItems: "center", gap: 8 }}>
                 <TrendingUp size={16} color="#0d9488" /> Recent Sales
               </h4>
               {salesLoading && (
@@ -436,7 +434,7 @@ export default function AdminDistributors() {
               )}
               {!salesLoading && distSales.map(s => (
                 <div key={s._id} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "10px 0", borderBottom: "1px solid #f3f4f6" }}>
-                  <div>
+                  <div style={{ flex: 1, minWidth: 0, paddingRight: 10 }}>
                     <div style={{ fontWeight: 700, color: "#3E3E5C", fontSize: 13 }}>{s.productName}</div>
                     <div style={{ fontSize: 11, color: "#7A7490" }}>
                       {s.quantity}{s.packSize ? ` × ${s.packSize}` : ""} • {s.saleType === "B2C" ? (s.farmerName || "Farmer") : (s.distributorName || "Dealer")}
@@ -444,7 +442,7 @@ export default function AdminDistributors() {
                     {s.village && <div style={{ fontSize: 10, color: "#9ca3af" }}>{s.village}{s.district ? `, ${s.district}` : ""}</div>}
                     <div style={{ fontSize: 10, color: "#9ca3af" }}>{new Date(s.createdAt).toLocaleString()}</div>
                   </div>
-                  <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 12 }}>
+                  <div style={{ textAlign: "right", flexShrink: 0 }}>
                     <div style={{ fontWeight: 900, color: "#16a34a", fontSize: 14 }}>{fmtMoney(s.totalAmount)}</div>
                     <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 20, background: s.saleType === "B2C" ? "#dcfce7" : "#dbeafe", color: s.saleType === "B2C" ? "#16a34a" : "#1d4ed8" }}>
                       {s.saleType}
@@ -461,8 +459,10 @@ export default function AdminDistributors() {
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes ping { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .5; transform: scale(1.4); } }
         * { box-sizing: border-box; }
-        @media (max-width: 768px) {
-          main { padding-top: 80px !important; }
+        .dist-brand { display: block; }
+        @media (max-width: 480px) {
+          .dist-brand { display: none; }
+          main { padding-top: 76px !important; }
         }
       `}</style>
     </div>
