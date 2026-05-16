@@ -159,20 +159,20 @@ export default function AdminDistributors() {
         ) : (
           <>
             {/* KPI STAT ROW */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14, marginBottom: 28 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12, marginBottom: 28 }}
+                 className="sm:grid-cols-4">
               {[
                 { label: "TOTAL DISTRIBUTORS", value: s.totalDistributors ?? 0,  grad: "linear-gradient(135deg,#3b758c,#1797a6)", icon: <Users size={22} /> },
                 { label: "ACTIVE TODAY",        value: s.activeDistributors ?? 0, grad: "linear-gradient(135deg,#3b758c,#1797a6)", icon: <span style={{ fontSize: 18 }}>🟢</span> },
-                { label: "FLEET DISTANCE",      value: fmtDist(s.totalFleetDistance) + " km", grad: "linear-gradient(135deg,#3b758c,#1797a6)", icon: <Navigation size={22} /> },
                 { label: "TODAY'S REVENUE",     value: fmtMoney(s.totalTodayRevenue), grad: "linear-gradient(135deg,#3b758c,#1797a6)", icon: <TrendingUp size={22} /> },
                 { label: "TOTAL STOCK",         value: s.totalStock ?? 0,          grad: "linear-gradient(135deg,#3b758c,#1797a6)", icon: <Package size={22} /> },
               ].map(k => (
-                <div key={k.label} style={{ background: k.grad, borderRadius: 18, padding: "18px 16px", color: "#fff", boxShadow: "0 6px 20px rgba(0,0,0,.12)" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
-                    <span style={{ fontSize: 10, fontWeight: 700, opacity: .8, letterSpacing: .4, lineHeight: 1.3 }}>{k.label}</span>
-                    <div style={{ background: "rgba(255,255,255,.2)", borderRadius: 8, padding: 6 }}>{k.icon}</div>
+                <div key={k.label} style={{ background: k.grad, borderRadius: 18, padding: "16px 14px", color: "#fff", boxShadow: "0 6px 20px rgba(0,0,0,.12)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+                    <span style={{ fontSize: 9, fontWeight: 700, opacity: .8, letterSpacing: .4, lineHeight: 1.3 }}>{k.label}</span>
+                    <div style={{ background: "rgba(255,255,255,.2)", borderRadius: 8, padding: 5 }}>{k.icon}</div>
                   </div>
-                  <div style={{ fontSize: 24, fontWeight: 900 }}>{k.value}</div>
+                  <div style={{ fontSize: 22, fontWeight: 900 }}>{k.value}</div>
                 </div>
               ))}
             </div>
