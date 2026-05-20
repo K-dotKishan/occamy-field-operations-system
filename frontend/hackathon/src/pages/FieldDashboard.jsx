@@ -540,6 +540,7 @@ function SaleForm({ onClose }) {
     notes: ""
   })
   const [photos, setPhotos] = useState([])
+  const [showPreview, setShowPreview] = useState(false)
 
   const totalAmount = formData.quantity * formData.pricePerUnit
 
@@ -579,8 +580,74 @@ function SaleForm({ onClose }) {
     }
   }
 
+  // ── Preview rows helper ───────────────────────────────────────────────────
+  const PreviewRow = ({ label, value }) => value ? (
+    <div className="flex justify-between py-2 border-b border-gray-100 last:border-0">
+      <span className="text-sm text-gray-500 font-medium">{label}</span>
+      <span className="text-sm font-bold text-gray-800 text-right max-w-xs">{value}</span>
+    </div>
+  ) : null
+
   return (
-    <div className="bg-white p-8 rounded-3xl shadow-2xl border-2 border-emerald-200">
+    <>
+      {/* ── PREVIEW MODAL ─────────────────────────────────────────────────── */}
+      {showPreview && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4" style={{ zIndex: 99999 }}>
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-y-auto" style={{ maxHeight: '90vh' }}>
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-5">
+                <div className={`px-3 py-1 rounded-full text-xs font-black ${saleType === 'B2C' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
+                  {saleType}
+                </div>
+                <h2 className="text-xl font-black text-gray-800">Order Preview</h2>
+              </div>
+
+              {/* Total highlight */}
+              <div className="bg-emerald-50 border-2 border-emerald-200 rounded-2xl p-4 mb-5 text-center">
+                <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Total Amount</p>
+                <p className="text-4xl font-black text-emerald-700">₹{totalAmount.toLocaleString()}</p>
+                <p className="text-xs text-gray-500 mt-1">{formData.quantity} × ₹{formData.pricePerUnit} per unit</p>
+              </div>
+
+              <div className="space-y-0">
+                <PreviewRow label="Product" value={formData.productName} />
+                <PreviewRow label="SKU" value={formData.productSKU} />
+                <PreviewRow label="Pack Size" value={formData.packSize} />
+                <PreviewRow label="Quantity" value={formData.quantity} />
+                <PreviewRow label="Price / Unit" value={formData.pricePerUnit ? `₹${formData.pricePerUnit}` : null} />
+                <PreviewRow label={saleType === 'B2C' ? 'Farmer Name' : 'Distributor Name'} value={formData.customerName} />
+                <PreviewRow label="Contact" value={formData.customerContact} />
+                {saleType === 'B2B' && <PreviewRow label="Distributor Type" value={formData.distributorType} />}
+                <PreviewRow label="Payment Mode" value={formData.paymentMode} />
+                <PreviewRow label="Village" value={formData.village} />
+                <PreviewRow label="District" value={formData.district} />
+                <PreviewRow label="State" value={formData.state} />
+                <PreviewRow label="Notes" value={formData.notes} />
+                <PreviewRow label="Repeat Order" value={formData.isRepeatOrder ? 'Yes' : null} />
+                {photos.length > 0 && <PreviewRow label="Photos" value={`${photos.length} attached`} />}
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => setShowPreview(false)}
+                  className="flex-1 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-xl font-bold transition-all"
+                >
+                  ← Edit / Back
+                </button>
+                <button
+                  onClick={() => { setShowPreview(false); handleSubmit() }}
+                  className="flex-1 py-3 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-xl font-bold transition-all shadow-lg"
+                >
+                  Confirm & Submit
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── FORM ──────────────────────────────────────────────────────────── */}
+      <div className="bg-white p-8 rounded-3xl shadow-2xl border-2 border-emerald-200">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-black text-gray-800">Record Sale</h2>
         <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
@@ -657,11 +724,12 @@ function SaleForm({ onClose }) {
         <button onClick={onClose} className="flex-1 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-xl font-bold transition-all">
           Cancel
         </button>
-        <button onClick={handleSubmit} className="flex-1 py-3 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-xl font-bold transition-all shadow-lg">
-          Save Sale
+        <button onClick={() => setShowPreview(true)} className="flex-1 py-3 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-xl font-bold transition-all shadow-lg">
+          Preview & Save
         </button>
       </div>
     </div>
+    </>
   )
 }
 

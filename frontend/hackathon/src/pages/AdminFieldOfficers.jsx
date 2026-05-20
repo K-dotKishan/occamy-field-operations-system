@@ -20,6 +20,7 @@ export default function AdminFieldOfficers() {
   const [autoRefresh, setAutoRefresh] = useState(true)
   const [selected, setSelected]       = useState(null)
   const [meetings, setMeetings]       = useState([])
+  const [officerSales, setOfficerSales] = useState([])
   const [meetLoading, setMeetLoading] = useState(false)
   const [isScrolled, setIsScrolled]   = useState(false)
 
@@ -62,13 +63,24 @@ export default function AdminFieldOfficers() {
 
   const openDetail = async (officer) => {
     setSelected(officer)
+    setOfficerSales([])
     setMeetLoading(true)
     try {
-      const m = await api(`/admin/field-officers/${officer._id}/meetings`)
+      const [m, s] = await Promise.all([
+        api(`/admin/field-officers/${officer._id}/meetings`),
+        api(`/admin/field-officers/${officer._id}/sales`)
+      ])
       setMeetings(m || [])
-    } catch (_) { setMeetings([]) }
+      setOfficerSales(s || [])
+    } catch (_) { setMeetings([]); setOfficerSales([]) }
     finally { setMeetLoading(false) }
   }
+
+  // Always read the freshest officer data from the live list so status and sales are never stale.
+  // Use string comparison — MongoDB ObjectIds are objects, strict === always fails.
+  const liveSelected = selected
+    ? (data?.officers?.find(o => String(o._id) === String(selected._id)) || selected)
+    : null
 
   const filtered = (data?.officers || []).filter(o =>
     o.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -195,14 +207,17 @@ export default function AdminFieldOfficers() {
 
               {/* Scrollable table wrapper */}
               <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
-                <div style={{ minWidth: 640 }}>
+                <div style={{ minWidth: 960 }}>
                   {/* Column headers */}
-                  <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr 1.2fr", gap: 8, padding: "10px 16px", background: "#f9fafb", borderBottom: "1px solid #f3f4f6", fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: .5 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1.2fr", gap: 8, padding: "10px 16px", background: "#f9fafb", borderBottom: "1px solid #f3f4f6", fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: .5 }}>
                     <div>Field Officer</div>
                     <div>Live Status</div>
                     <div>Meetings</div>
                     <div>Samples</div>
                     <div>Distance</div>
+                    <div>B2B Sales</div>
+                    <div>B2C Sales</div>
+                    <div>Last Product</div>
                     <div>Actions</div>
                   </div>
 
@@ -217,7 +232,7 @@ export default function AdminFieldOfficers() {
 
                   {filtered.map((o, idx) => (
                     <div key={o._id} style={{
-                      display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr 1.2fr",
+                      display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1.2fr",
                       gap: 8, padding: "12px 16px", borderBottom: "1px solid #f3f4f6",
                       background: idx % 2 === 0 ? "#fff" : "#fafafa", alignItems: "center", transition: "background .15s"
                     }}
@@ -266,6 +281,21 @@ export default function AdminFieldOfficers() {
                         <div style={{ fontWeight: 900, fontSize: 14, color: o.isActive ? "#0d9488" : "#6b7280" }}>{fmtDist(o.totalDistance)} km</div>
                         {o.lastLocationTime && <div style={{ fontSize: 10, color: "#9ca3af" }}>{fmtTime(o.lastLocationTime)}</div>}
                       </div>
+                      {/* B2B Sales */}
+                      <div>
+                        <div style={{ fontWeight: 900, fontSize: 16, color: "#1d4ed8" }}>{o.b2bSalesToday || 0}</div>
+                        <div style={{ fontSize: 10, color: "#9ca3af" }}>B2B</div>
+                      </div>
+                      {/* B2C Sales */}
+                      <div>
+                        <div style={{ fontWeight: 900, fontSize: 16, color: "#16a34a" }}>{o.b2cSalesToday || 0}</div>
+                        <div style={{ fontSize: 10, color: "#9ca3af" }}>B2C</div>
+                      </div>
+                      {/* Last Product */}
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 700, fontSize: 12, color: "#3E3E5C", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.lastProductName || "—"}</div>
+                        {o.lastProductPrice > 0 && <div style={{ fontSize: 10, color: "#0d9488", fontWeight: 700 }}>₹{o.lastProductPrice}</div>}
+                      </div>
                       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                         <button onClick={() => openDetail(o)}
                           style={{ background: "#3b82f6", color: "#fff", border: "none", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontFamily: "Poppins, sans-serif", fontWeight: 700, fontSize: 11 }}>
@@ -288,7 +318,7 @@ export default function AdminFieldOfficers() {
       </main>
 
       {/* DETAIL MODAL */}
-      {selected && (
+      {selected && liveSelected && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", backdropFilter: "blur(4px)", zIndex: 3000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
           onClick={() => setSelected(null)}>
           <div style={{ background: "#fff", borderRadius: 24, boxShadow: "0 24px 80px rgba(0,0,0,.2)", width: "100%", maxWidth: 640, maxHeight: "85vh", overflowY: "auto" }}
@@ -298,14 +328,14 @@ export default function AdminFieldOfficers() {
             <div style={{ background: "linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)", padding: "20px 20px", borderRadius: "24px 24px 0 0", color: "#fff" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                 <div style={{ flex: 1, minWidth: 0, paddingRight: 12 }}>
-                  <h3 style={{ margin: 0, fontSize: "clamp(16px, 4vw, 20px)", fontWeight: 900 }}>{selected.name}</h3>
-                  <p style={{ margin: "4px 0 0", fontSize: 12, color: "rgba(255,255,255,.7)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{selected.phone} • {selected.email}</p>
+                  <h3 style={{ margin: 0, fontSize: "clamp(16px, 4vw, 20px)", fontWeight: 900 }}>{liveSelected.name}</h3>
+                  <p style={{ margin: "4px 0 0", fontSize: 12, color: "rgba(255,255,255,.7)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{liveSelected.phone} • {liveSelected.email}</p>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
-                    <span style={{ padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700, background: selected.isActive ? "rgba(34,197,94,.3)" : "rgba(255,255,255,.2)", color: selected.isActive ? "#bbf7d0" : "rgba(255,255,255,.7)" }}>
-                      {selected.isActive ? "🟢 GPS Active" : "⚫ Offline"}
+                    <span style={{ padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700, background: liveSelected.isActive ? "rgba(34,197,94,.3)" : "rgba(255,255,255,.2)", color: liveSelected.isActive ? "#bbf7d0" : "rgba(255,255,255,.7)" }}>
+                      {liveSelected.isActive ? "🟢 GPS Active" : "⚫ Offline"}
                     </span>
                     <span style={{ padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700, background: "rgba(255,255,255,.2)", color: "#fff" }}>
-                      📏 {fmtDist(selected.totalDistance)} km today
+                      📏 {fmtDist(liveSelected.totalDistance)} km today
                     </span>
                   </div>
                 </div>
@@ -313,18 +343,79 @@ export default function AdminFieldOfficers() {
               </div>
             </div>
 
-            {/* Quick stats */}
+            {/* Quick stats — meetings, samples, distance + sales breakdown */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 1, borderBottom: "1px solid #f3f4f6" }}>
               {[
-                { label: "Meetings Today", value: selected.meetingsToday ?? 0, color: "#9333ea" },
-                { label: "Samples Today",  value: selected.samplesToday ?? 0,  color: "#f97316" },
-                { label: "Distance Today", value: fmtDist(selected.totalDistance) + " km", color: "#0d9488" },
+                { label: "Meetings Today", value: liveSelected.meetingsToday ?? 0, color: "#9333ea" },
+                { label: "Samples Today",  value: liveSelected.samplesToday ?? 0,  color: "#f97316" },
+                { label: "Distance Today", value: fmtDist(liveSelected.totalDistance) + " km", color: "#0d9488" },
               ].map(k => (
                 <div key={k.label} style={{ padding: "14px 10px", textAlign: "center" }}>
                   <div style={{ fontSize: "clamp(16px, 4vw, 22px)", fontWeight: 900, color: k.color }}>{k.value}</div>
                   <div style={{ fontSize: 10, color: "#7A7490", marginTop: 4 }}>{k.label}</div>
                 </div>
               ))}
+            </div>
+
+            {/* Sales breakdown row */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 1, borderBottom: "1px solid #f3f4f6", background: "#fafafa" }}>
+              {[
+                { label: "Total Sales Today", value: liveSelected.salesToday ?? 0,    color: "#1d4ed8" },
+                { label: "B2C Sales",          value: liveSelected.b2cSalesToday ?? 0, color: "#16a34a" },
+                { label: "B2B Sales",          value: liveSelected.b2bSalesToday ?? 0, color: "#0d9488" },
+              ].map(k => (
+                <div key={k.label} style={{ padding: "12px 10px", textAlign: "center" }}>
+                  <div style={{ fontSize: "clamp(14px, 3.5vw, 20px)", fontWeight: 900, color: k.color }}>{k.value}</div>
+                  <div style={{ fontSize: 10, color: "#7A7490", marginTop: 3 }}>{k.label}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Sales breakdown */}
+            <div style={{ padding: "16px 16px", borderBottom: "1px solid #f3f4f6" }}>
+              <h4 style={{ margin: "0 0 12px", color: "#3E3E5C", fontWeight: 800, fontSize: 15, display: "flex", alignItems: "center", gap: 8 }}>
+                <TrendingUp size={16} color="#16a34a" /> Sales History
+              </h4>
+              {meetLoading && (
+                <div style={{ textAlign: "center", padding: "16px 0" }}>
+                  <div style={{ width: 28, height: 28, border: "4px solid #dbeafe", borderTopColor: "#3b82f6", borderRadius: "50%", animation: "spin 1s linear infinite", margin: "0 auto" }} />
+                </div>
+              )}
+              {!meetLoading && officerSales.length === 0 && (
+                <div style={{ textAlign: "center", padding: "16px 0", color: "#7A7490", fontSize: 13 }}>No sales recorded yet</div>
+              )}
+              {!meetLoading && officerSales.length > 0 && (
+                <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, minWidth: 400 }}>
+                    <thead>
+                      <tr style={{ background: "#f9fafb" }}>
+                        {["Product", "Type", "Qty", "Price/Unit", "Total", "Date"].map(h => (
+                          <th key={h} style={{ padding: "8px 10px", textAlign: "left", fontWeight: 700, color: "#6b7280", fontSize: 10, textTransform: "uppercase", letterSpacing: .4, borderBottom: "1px solid #f3f4f6" }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {officerSales.map((sale, i) => (
+                        <tr key={sale._id || i} style={{ borderBottom: "1px solid #f9fafb" }}>
+                          <td style={{ padding: "8px 10px", fontWeight: 600, color: "#3E3E5C" }}>
+                            {sale.productName || "—"}
+                            {sale.packSize && <div style={{ fontSize: 10, color: "#9ca3af" }}>{sale.packSize}</div>}
+                          </td>
+                          <td style={{ padding: "8px 10px" }}>
+                            <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 20, background: sale.saleType === "B2C" ? "#dcfce7" : "#dbeafe", color: sale.saleType === "B2C" ? "#16a34a" : "#1d4ed8" }}>
+                              {sale.saleType}
+                            </span>
+                          </td>
+                          <td style={{ padding: "8px 10px", fontWeight: 700, color: "#3E3E5C" }}>{sale.quantity ?? "—"}</td>
+                          <td style={{ padding: "8px 10px", color: "#0d9488", fontWeight: 700 }}>₹{sale.pricePerUnit ?? "—"}</td>
+                          <td style={{ padding: "8px 10px", fontWeight: 900, color: "#16a34a" }}>₹{(sale.totalAmount || 0).toLocaleString()}</td>
+                          <td style={{ padding: "8px 10px", color: "#9ca3af", fontSize: 10 }}>{new Date(sale.createdAt).toLocaleDateString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
 
             {/* Meeting history */}

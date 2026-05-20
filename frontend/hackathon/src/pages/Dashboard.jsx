@@ -3458,6 +3458,7 @@ function EnhancedSaleForm({ onClose }) {
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState({})
   const [photo, setPhoto] = useState(null)
+  const [showPreview, setShowPreview] = useState(false)
   const [photoPreview, setPhotoPreview] = useState(null)
 
   const totalAmount = formData.quantity * formData.price
@@ -3836,13 +3837,79 @@ function EnhancedSaleForm({ onClose }) {
           Cancel
         </button>
         <button
-          onClick={handleSubmit}
+          onClick={() => {
+            if (!validateForm()) {
+              showNotification("error", "Please fix the errors in the form")
+              return
+            }
+            setShowPreview(true)
+          }}
           disabled={loading}
           className="flex-1 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white rounded-xl font-bold transition-all shadow-lg hover:shadow-xl disabled:opacity-50"
         >
-          {loading ? "Recording..." : "Record Sale"}
+          {loading ? "Recording..." : "Preview & Submit"}
         </button>
       </div>
+
+      {/* ── ORDER PREVIEW MODAL ─────────────────────────────────────────── */}
+      {showPreview && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999, padding: 16 }}>
+          <div style={{ background: '#fff', borderRadius: 24, boxShadow: '0 24px 80px rgba(0,0,0,.25)', width: '100%', maxWidth: 460, maxHeight: '90vh', overflowY: 'auto', fontFamily: 'inherit' }}>
+            <div style={{ padding: '24px 24px 0' }}>
+              {/* Header */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                <span style={{ padding: '3px 12px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: formData.saleType === 'B2C' ? '#dcfce7' : '#dbeafe', color: formData.saleType === 'B2C' ? '#16a34a' : '#1d4ed8' }}>
+                  {formData.saleType}
+                </span>
+                <h2 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: '#1e293b' }}>Order Preview</h2>
+              </div>
+
+              {/* Total highlight */}
+              <div style={{ background: '#f0fdf4', border: '2px solid #86efac', borderRadius: 16, padding: 16, marginBottom: 20, textAlign: 'center' }}>
+                <p style={{ margin: 0, fontSize: 11, color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>Total Amount</p>
+                <p style={{ margin: '4px 0 0', fontSize: 36, fontWeight: 900, color: '#16a34a' }}>₹{(formData.quantity * formData.price).toLocaleString()}</p>
+                <p style={{ margin: '4px 0 0', fontSize: 12, color: '#64748b' }}>{formData.quantity} × ₹{formData.price} per unit</p>
+              </div>
+
+              {/* Detail rows */}
+              {[
+                ['Product', formData.productName],
+                ['Quantity', formData.quantity],
+                ['Price / Unit', formData.price ? `₹${formData.price}` : null],
+                ['Sale Type', formData.saleType],
+                formData.saleType === 'B2C' ? ['Customer Name', formData.farmerName] : ['Distributor Name', formData.distributorName],
+                ['Village', formData.village],
+                ['District', formData.district],
+                ['State', formData.state],
+                ['Notes', formData.notes],
+                photo ? ['Photo', '1 attached'] : null,
+              ].filter(r => r && r[1]).map(([label, value]) => (
+                <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #f1f5f9' }}>
+                  <span style={{ fontSize: 13, color: '#64748b', fontWeight: 600 }}>{label}</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#1e293b', textAlign: 'right', maxWidth: '60%' }}>{value}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Action buttons */}
+            <div style={{ display: 'flex', gap: 10, padding: 24 }}>
+              <button
+                onClick={() => setShowPreview(false)}
+                style={{ flex: 1, padding: '12px', background: '#f1f5f9', color: '#1e293b', border: '1.5px solid #e2e8f0', borderRadius: 14, cursor: 'pointer', fontWeight: 700, fontSize: 13 }}
+              >
+                ← Edit / Back
+              </button>
+              <button
+                onClick={() => { setShowPreview(false); handleSubmit() }}
+                disabled={loading}
+                style={{ flex: 1, padding: '12px', background: 'linear-gradient(135deg,#2563eb,#0891b2)', color: '#fff', border: 'none', borderRadius: 14, cursor: loading ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: 13, opacity: loading ? 0.7 : 1 }}
+              >
+                {loading ? 'Recording...' : 'Confirm & Submit'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -240,7 +240,7 @@ export default function Login() {
             </p>
           </div>
 
-          <div style={{ minHeight: '260px' }}>
+          <div style={{ minHeight: '360px' }}>
             <form onSubmit={handleSubmit} autoComplete="off" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {isSignup && (
                 <>
@@ -343,6 +343,7 @@ export default function Login() {
             </form>
           </div>
 
+          <div style={{ marginBottom: '36px' }} />
         </div>
 
         <div style={{ marginTop: '20px', borderTop: `1px solid ${C.border}`, paddingTop: '16px', width: '100%', maxWidth: '520px' }}>

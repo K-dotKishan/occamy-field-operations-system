@@ -396,7 +396,8 @@ export async function getFieldOfficers(req, res) {
             todaySamplesAgg,
             todayMeetingSamplesAgg,
             lastLocations,
-            recentDailyLogs
+            recentDailyLogs,
+            todaySalesAgg
         ] = await Promise.all([
             // Open attendance sessions → GPS active + live distance
             Attendance.find({ userId: { $in: officerIds }, endTime: null })
@@ -448,7 +449,24 @@ export async function getFieldOfficers(req, res) {
             })
                 .select("userId startTime endTime totalDistance startLocation endLocation")
                 .sort({ startTime: -1 })
-                .lean()
+                .lean(),
+
+            // Today's B2C and B2B sales per officer
+            Sale.aggregate([
+                { $match: { userId: { $in: officerIds }, createdAt: { $gte: today } } },
+                { $sort: { createdAt: -1 } },
+                {
+                    $group: {
+                        _id: "$userId",
+                        salesToday:       { $sum: 1 },
+                        b2cSalesToday:    { $sum: { $cond: [{ $eq: ["$saleType", "B2C"] }, 1, 0] } },
+                        b2bSalesToday:    { $sum: { $cond: [{ $eq: ["$saleType", "B2B"] }, 1, 0] } },
+                        revenueToday:     { $sum: "$totalAmount" },
+                        lastProductName:  { $first: "$productName" },
+                        lastProductPrice: { $first: "$pricePerUnit" }
+                    }
+                }
+            ])
         ])
 
         // Build O(1) lookup maps — keys are string IDs
@@ -457,6 +475,7 @@ export async function getFieldOfficers(req, res) {
         const sampleMap         = new Map(todaySamplesAgg.map(s => [s._id.toString(), s.samplesToday]))
         const meetingSampleMap  = new Map(todayMeetingSamplesAgg.map(s => [s._id.toString(), s.meetingSamplesToday]))
         const locationMap       = new Map(lastLocations.map(l => [l._id.toString(), l]))
+        const salesMap          = new Map(todaySalesAgg.map(s => [s._id.toString(), s]))
 
         // Sum today's distance per officer (handles multiple sessions in one day)
         const distanceMap = new Map()
@@ -483,6 +502,7 @@ export async function getFieldOfficers(req, res) {
             const id  = officer._id.toString()
             const att = activeAttMap.get(id)
             const loc = locationMap.get(id)
+            const sal = salesMap.get(id)
 
             // currentSession: the live open attendance record (null if day not started)
             const currentSession = att ? {
@@ -506,6 +526,12 @@ export async function getFieldOfficers(req, res) {
                 locationAccuracy: loc?.accuracy  || null,
                 meetingsToday:    meetingMap.get(id) || 0,
                 samplesToday:     (sampleMap.get(id) || 0) + (meetingSampleMap.get(id) || 0),
+                salesToday:       sal?.salesToday       || 0,
+                b2cSalesToday:    sal?.b2cSalesToday    || 0,
+                b2bSalesToday:    sal?.b2bSalesToday    || 0,
+                revenueToday:     sal?.revenueToday     || 0,
+                lastProductName:  sal?.lastProductName  || "—",
+                lastProductPrice: sal?.lastProductPrice || 0,
                 currentSession
             }
         })
@@ -539,6 +565,23 @@ export async function getOfficerMeetings(req, res) {
     } catch (err) {
         console.error("Get officer meetings error:", err)
         res.status(500).json({ error: "Failed to fetch officer meetings" })
+    }
+}
+
+/* ================= OFFICER SALES HISTORY ================= */
+export async function getOfficerSales(req, res) {
+    try {
+        if (req.user.role !== "ADMIN") return res.status(403).json({ error: "Forbidden" })
+
+        const sales = await Sale.find({ userId: req.params.officerId })
+            .sort({ createdAt: -1 })
+            .limit(100)
+            .lean()
+
+        res.json(sales)
+    } catch (err) {
+        console.error("Get officer sales error:", err)
+        res.status(500).json({ error: "Failed to fetch officer sales" })
     }
 }
 

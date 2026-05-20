@@ -1,4 +1,4 @@
-﻿﻿import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import occamyLogo from '../assets/occamylogo.jpg'
@@ -7,8 +7,8 @@ import { TrendingUp, Package, LogOut, Menu, Navigation, Warehouse, Plus, X, Refr
 const MIN_DAY_HOURS = 7
 const C = { bg:'#FDF8E1', navy:'#3E3E5C', teal:'#4A6D7C', green:'#7FB069', card:'#FFFFFF', border:'#D8D5C5', muted:'#7A7490', inputBg:'#EAF1FF' }
 
-const fmtTime = (iso) => { if (!iso) return '—'; return new Date(iso).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' }) }
-const fmtDate = (iso) => { if (!iso) return '—'; return new Date(iso).toLocaleDateString() }
+const fmtTime = (iso) => { if (!iso) return '�'; return new Date(iso).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' }) }
+const fmtDate = (iso) => { if (!iso) return '�'; return new Date(iso).toLocaleDateString() }
 const fmtDist = (n) => parseFloat(n || 0).toFixed(2)
 
 function notify(type, msg) {
@@ -49,6 +49,7 @@ export default function DistributorDashboard() {
   const [showSaleForm, setShowSaleForm] = useState(false)
   const [saleForm, setSaleForm] = useState({ productName:'', packSize:'', quantity:'', pricePerUnit:'', saleType:'B2C', farmerName:'', farmerContact:'', distributorName:'', distributorContact:'', distributorType:'', paymentMode:'CASH', village:'', district:'', state:'', notes:'' })
   const [saleLoading, setSaleLoading] = useState(false)
+  const [showSalePreview, setShowSalePreview] = useState(false)
   const [attendanceHistory, setAttendanceHistory] = useState([])
   const menuRef = useRef(null)
 
@@ -200,7 +201,7 @@ export default function DistributorDashboard() {
   }
 
   const submitSale = async (e) => {
-    e.preventDefault()
+    if (e && e.preventDefault) e.preventDefault()
     if (!saleForm.productName || !saleForm.quantity || !saleForm.saleType) { notify('error', 'Product, quantity and sale type required'); return }
     setSaleLoading(true)
     try {
@@ -209,9 +210,16 @@ export default function DistributorDashboard() {
       notify('success', 'Sale recorded: Rs.' + total.toLocaleString())
       setSaleForm({ productName:'', packSize:'', quantity:'', pricePerUnit:'', saleType:'B2C', farmerName:'', farmerContact:'', distributorName:'', distributorContact:'', distributorType:'', paymentMode:'CASH', village:'', district:'', state:'', notes:'' })
       setShowSaleForm(false)
+      setShowSalePreview(false)
       loadAll()
     } catch (err) { notify('error', err?.error || 'Failed to record sale') }
     finally { setSaleLoading(false) }
+  }
+
+  const openSalePreview = (e) => {
+    e.preventDefault()
+    if (!saleForm.productName || !saleForm.quantity || !saleForm.saleType) { notify('error', 'Product, quantity and sale type required'); return }
+    setShowSalePreview(true)
   }
 
   const logout = () => { stopTracking(); localStorage.clear(); navigate('/login') }
@@ -271,8 +279,8 @@ export default function DistributorDashboard() {
       {/* MAIN */}
       <main style={{ maxWidth:1200, margin:'0 auto', padding:'88px 16px 40px' }}>
         <div style={{ marginBottom:24 }}>
-          <h1 style={{ fontSize:26, fontWeight:900, color:C.navy, margin:0 }}>Welcome, {userName} 👋</h1>
-          <p style={{ color:C.muted, fontSize:13, margin:'4px 0 0' }}>Distributor Portal — Occamy Bioscience</p>
+          <h1 style={{ fontSize:26, fontWeight:900, color:C.navy, margin:0 }}>Welcome, {userName}</h1>
+          <p style={{ color:C.muted, fontSize:13, margin:'4px 0 0' }}>Distributor Portal &bull; Occamy Bioscience</p>
         </div>
 
         {/* TAB NAV */}
@@ -285,16 +293,16 @@ export default function DistributorDashboard() {
           ))}
         </div>
 
-        {/* ATTENDANCE BANNER — hidden for Distributor role */}
+        {/* ATTENDANCE BANNER � hidden for Distributor role */}
         {false && (
         <div style={{ background: activeAttendance ? 'linear-gradient(135deg,'+C.green+' 0%,'+C.teal+' 100%)' : 'linear-gradient(135deg,#718096 0%,#4a5568 100%)', borderRadius:18, padding:'18px 22px', marginBottom:24, color:'#fff', display:'flex', flexWrap:'wrap', alignItems:'center', justifyContent:'space-between', gap:14 }}>
           <div style={{ display:'flex', alignItems:'center', gap:14 }}>
             <div style={{ background:'rgba(255,255,255,.2)', borderRadius:12, padding:10 }}><Navigation size={24} /></div>
             <div>
-              <div style={{ fontWeight:800, fontSize:16 }}>{activeAttendance ? 'Day Active — GPS Tracking ON' : 'Day Not Started'}</div>
+              <div style={{ fontWeight:800, fontSize:16 }}>{activeAttendance ? 'Day Active � GPS Tracking ON' : 'Day Not Started'}</div>
               <div style={{ fontSize:12, opacity:.85, marginTop:2 }}>
                 {activeAttendance
-                  ? 'Started at ' + fmtTime(activeAttendance.startTime) + ' • ' + fmtDist(distanceTraveled) + ' km traveled'
+                  ? 'Started at ' + fmtTime(activeAttendance.startTime) + ' � ' + fmtDist(distanceTraveled) + ' km traveled'
                   : 'Click Start Day to begin attendance and GPS tracking'}
               </div>
             </div>
@@ -327,7 +335,7 @@ export default function DistributorDashboard() {
               ].map(k => (
                 <div key={k.label} style={{ background:'linear-gradient(135deg,#3b758c 0%,#1797a6 100%)', borderRadius:16, padding:'18px 16px', boxShadow:'0 6px 20px rgba(59,117,140,.25)', color:'#fff' }}>
                   <div style={{ fontSize:10, fontWeight:700, opacity:.85, letterSpacing:.5, marginBottom:8 }}>{k.label}</div>
-                  <div style={{ fontSize:22, fontWeight:900 }}>{k.value ?? '—'}</div>
+                  <div style={{ fontSize:22, fontWeight:900 }}>{k.value ?? '�'}</div>
                 </div>
               ))}
             </div>
@@ -387,7 +395,7 @@ export default function DistributorDashboard() {
                 <div key={item._id} style={{ padding:'14px 18px', borderBottom:'1px solid '+C.border, display:'flex', flexWrap:'wrap', justifyContent:'space-between', alignItems:'center', gap:10 }}>
                   <div>
                     <div style={{ fontWeight:700, color:C.navy, fontSize:14 }}>{item.productName}</div>
-                    <div style={{ fontSize:12, color:C.muted }}>{item.packSize || '—'}{item.productSKU ? ' • '+item.productSKU : ''}</div>
+                    <div style={{ fontSize:12, color:C.muted }}>{item.packSize || '-'}{item.productSKU ? ' \u00b7 '+item.productSKU : ''}</div>
                     <div style={{ fontSize:11, color:C.muted, marginTop:2 }}>Updated: {fmtDate(item.lastUpdated)}</div>
                   </div>
                   <div style={{ display:'flex', gap:16, flexWrap:'wrap' }}>
@@ -416,11 +424,11 @@ export default function DistributorDashboard() {
                   <h3 style={{ margin:0, color:C.navy, fontWeight:800, fontSize:16 }}>Record Sale Transaction</h3>
                   <button onClick={() => setShowSaleForm(false)} style={{ background:'none', border:'none', cursor:'pointer', color:C.muted }}><X size={20} /></button>
                 </div>
-                <form onSubmit={submitSale} style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))', gap:12 }}>
+                <form onSubmit={openSalePreview} style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))', gap:12 }}>
                   <div><label style={LS}>Sale Type *</label>
                     <select style={inp} onFocus={onF} onBlur={onB} value={saleForm.saleType} onChange={e => setSaleForm({...saleForm, saleType:e.target.value})}>
-                      <option value="B2C">B2C — Direct to Farmer</option>
-                      <option value="B2B">B2B — To Retailer / Dealer</option>
+                      <option value="B2C">B2C � Direct to Farmer</option>
+                      <option value="B2B">B2B � To Retailer / Dealer</option>
                     </select>
                   </div>
                   <div><label style={LS}>Product Name *</label><input style={inp} onFocus={onF} onBlur={onB} placeholder="Product name" value={saleForm.productName} onChange={e => setSaleForm({...saleForm, productName:e.target.value})} required /></div>
@@ -453,7 +461,7 @@ export default function DistributorDashboard() {
                   <div style={{ gridColumn:'1 / -1' }}><label style={LS}>Notes</label><input style={inp} onFocus={onF} onBlur={onB} placeholder="Optional notes" value={saleForm.notes} onChange={e => setSaleForm({...saleForm, notes:e.target.value})} /></div>
                   <div style={{ gridColumn:'1 / -1', display:'flex', gap:10, justifyContent:'flex-end', marginTop:4 }}>
                     <button type="button" onClick={() => setShowSaleForm(false)} style={BS}>Cancel</button>
-                    <button type="submit" disabled={saleLoading} style={{...BP, background:C.green, opacity: saleLoading ? .7 : 1}}>{saleLoading ? 'Saving...' : 'Record Sale'}</button>
+                    <button type="submit" disabled={saleLoading} style={{...BP, background:C.green, opacity: saleLoading ? .7 : 1}}>{saleLoading ? 'Saving...' : 'Preview & Submit'}</button>
                   </div>
                 </form>
               </div>
@@ -480,11 +488,11 @@ export default function DistributorDashboard() {
                   <h3 style={{ margin:0, color:C.navy, fontWeight:800, fontSize:16 }}>Record Sale Transaction</h3>
                   <button onClick={() => setShowSaleForm(false)} style={{ background:'none', border:'none', cursor:'pointer', color:C.muted }}><X size={20} /></button>
                 </div>
-                <form onSubmit={submitSale} style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))', gap:12 }}>
+                <form onSubmit={openSalePreview} style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))', gap:12 }}>
                   <div><label style={LS}>Sale Type *</label>
                     <select style={inp} onFocus={onF} onBlur={onB} value={saleForm.saleType} onChange={e => setSaleForm({...saleForm, saleType:e.target.value})}>
-                      <option value="B2C">B2C — Direct to Farmer</option>
-                      <option value="B2B">B2B — To Retailer / Dealer</option>
+                      <option value="B2C">B2C � Direct to Farmer</option>
+                      <option value="B2B">B2B � To Retailer / Dealer</option>
                     </select>
                   </div>
                   <div><label style={LS}>Product Name *</label><input style={inp} onFocus={onF} onBlur={onB} placeholder="Product name" value={saleForm.productName} onChange={e => setSaleForm({...saleForm, productName:e.target.value})} required /></div>
@@ -517,7 +525,7 @@ export default function DistributorDashboard() {
                   <div style={{ gridColumn:'1 / -1' }}><label style={LS}>Notes</label><input style={inp} onFocus={onF} onBlur={onB} placeholder="Optional notes" value={saleForm.notes} onChange={e => setSaleForm({...saleForm, notes:e.target.value})} /></div>
                   <div style={{ gridColumn:'1 / -1', display:'flex', gap:10, justifyContent:'flex-end', marginTop:4 }}>
                     <button type="button" onClick={() => setShowSaleForm(false)} style={BS}>Cancel</button>
-                    <button type="submit" disabled={saleLoading} style={{...BP, background:C.green, opacity: saleLoading ? .7 : 1}}>{saleLoading ? 'Saving...' : 'Record Sale'}</button>
+                    <button type="submit" disabled={saleLoading} style={{...BP, background:C.green, opacity: saleLoading ? .7 : 1}}>{saleLoading ? 'Saving...' : 'Preview & Submit'}</button>
                   </div>
                 </form>
               </div>
@@ -529,7 +537,7 @@ export default function DistributorDashboard() {
           </>
         )}
 
-        {/* ATTENDANCE TAB — hidden for Distributor role (logic preserved) */}
+        {/* ATTENDANCE TAB � hidden for Distributor role (logic preserved) */}
         {false && activeTab === 'attendance' && (
           <>
             <h2 style={{ fontSize:20, fontWeight:900, color:C.navy, marginBottom:16 }}>Attendance History</h2>
@@ -569,11 +577,74 @@ export default function DistributorDashboard() {
         * { box-sizing: border-box; }
         @media (max-width: 600px) { main { padding-top: 80px !important; } }
       `}</style>
+
+      {/* ── SALE PREVIEW MODAL ──────────────────────────────────────────── */}
+      {showSalePreview && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.5)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999, padding:16 }}>
+          <div style={{ background:'#fff', borderRadius:24, boxShadow:'0 24px 80px rgba(0,0,0,.2)', width:'100%', maxWidth:480, maxHeight:'90vh', overflowY:'auto', fontFamily:'Poppins,sans-serif' }}>
+            <div style={{ padding:'24px 24px 0' }}>
+              <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:16 }}>
+                <span style={{ padding:'3px 12px', borderRadius:20, fontSize:11, fontWeight:700, background: saleForm.saleType === 'B2C' ? '#dcfce7' : '#dbeafe', color: saleForm.saleType === 'B2C' ? '#16a34a' : '#1d4ed8' }}>{saleForm.saleType}</span>
+                <h2 style={{ margin:0, fontSize:18, fontWeight:900, color:C.navy }}>Order Preview</h2>
+              </div>
+
+              {/* Total highlight */}
+              <div style={{ background:'#f0fdf4', border:'2px solid #86efac', borderRadius:16, padding:'16px', marginBottom:20, textAlign:'center' }}>
+                <p style={{ margin:0, fontSize:11, color:C.muted, fontWeight:700, textTransform:'uppercase', letterSpacing:.5 }}>Total Amount</p>
+                <p style={{ margin:'4px 0 0', fontSize:36, fontWeight:900, color:'#16a34a' }}>Rs.{((parseFloat(saleForm.pricePerUnit)||0)*(parseFloat(saleForm.quantity)||0)).toLocaleString()}</p>
+                <p style={{ margin:'4px 0 0', fontSize:12, color:C.muted }}>{saleForm.quantity} × Rs.{saleForm.pricePerUnit} per unit</p>
+              </div>
+
+              {/* Detail rows */}
+              {[
+                ['Product', saleForm.productName],
+                ['Pack Size', saleForm.packSize],
+                ['Quantity', saleForm.quantity],
+                ['Price / Unit', saleForm.pricePerUnit ? 'Rs.' + saleForm.pricePerUnit : null],
+                ['Sale Type', saleForm.saleType],
+                saleForm.saleType === 'B2C'
+                  ? ['Farmer Name', saleForm.farmerName]
+                  : ['Retailer / Dealer', saleForm.distributorName],
+                saleForm.saleType === 'B2C'
+                  ? ['Farmer Contact', saleForm.farmerContact]
+                  : ['Contact', saleForm.distributorContact],
+                saleForm.saleType === 'B2B' ? ['Dealer Type', saleForm.distributorType] : null,
+                ['Payment Mode', saleForm.paymentMode],
+                ['Village', saleForm.village],
+                ['District', saleForm.district],
+                ['State', saleForm.state],
+                ['Notes', saleForm.notes],
+              ].filter(r => r && r[1]).map(([label, value]) => (
+                <div key={label} style={{ display:'flex', justifyContent:'space-between', padding:'8px 0', borderBottom:'1px solid #f3f4f6' }}>
+                  <span style={{ fontSize:12, color:C.muted, fontWeight:600 }}>{label}</span>
+                  <span style={{ fontSize:12, fontWeight:700, color:C.navy, textAlign:'right', maxWidth:'60%' }}>{value}</span>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display:'flex', gap:10, padding:24 }}>
+              <button
+                onClick={() => setShowSalePreview(false)}
+                style={{ flex:1, padding:'12px', background:C.inputBg, color:C.navy, border:'1.5px solid '+C.border, borderRadius:14, cursor:'pointer', fontFamily:'Poppins,sans-serif', fontWeight:700, fontSize:13 }}
+              >
+                ← Edit / Back
+              </button>
+              <button
+                onClick={submitSale}
+                disabled={saleLoading}
+                style={{ flex:1, padding:'12px', background:C.green, color:'#fff', border:'none', borderRadius:14, cursor: saleLoading ? 'not-allowed' : 'pointer', fontFamily:'Poppins,sans-serif', fontWeight:700, fontSize:13, opacity: saleLoading ? .7 : 1 }}
+              >
+                {saleLoading ? 'Saving...' : 'Confirm & Submit'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
-/* ── Sub-components ─────────────────────────────────────── */
+/* -- Sub-components --------------------------------------- */
 
 function SectionCard({ title, children, onRefresh }) {
   return (
@@ -627,7 +698,7 @@ function SaleRow({ sale }) {
 function EmptyRow({ msg }) {
   return (
     <div style={{ padding:'32px 18px', textAlign:'center', color:'#7A7490', fontSize:13 }}>
-      <div style={{ fontSize:32, marginBottom:8 }}>📭</div>
+      <div style={{ fontSize:32, marginBottom:8 }}>??</div>
       {msg}
     </div>
   )
