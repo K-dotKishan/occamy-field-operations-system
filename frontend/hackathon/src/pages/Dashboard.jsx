@@ -3445,8 +3445,8 @@ function EnhancedFieldMeetingGroup({ onClose }) {
 function EnhancedSaleForm({ onClose }) {
   const [formData, setFormData] = useState({
     productName: "",
-    quantity: 1,
-    price: 0,
+    quantity: "",
+    price: "",
     saleType: "B2C",
     farmerName: "",
     distributorName: "",
@@ -3561,8 +3561,8 @@ function EnhancedSaleForm({ onClose }) {
       showNotification("success", "Sale recorded successfully!")
       setFormData({
         productName: "",
-        quantity: 1,
-        price: 0,
+        quantity: "",
+        price: "",
         saleType: "B2C",
         farmerName: "",
         distributorName: "",
