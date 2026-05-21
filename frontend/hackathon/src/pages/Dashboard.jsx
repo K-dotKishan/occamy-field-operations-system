@@ -3769,22 +3769,41 @@ function EnhancedSaleForm({ onClose }) {
                 <>
                   <Camera size={32} className="text-gray-400" />
                   <div className="text-center">
-                    <p className="text-sm text-gray-600 mb-1">Click to upload product photo</p>
+                    <p className="text-sm text-gray-600 mb-1">Upload or capture a product photo</p>
                     <p className="text-xs text-gray-500">Supports JPG, PNG, WEBP</p>
                   </div>
                 </>
               )}
-              <label className="cursor-pointer">
-                <div className="px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-600 text-white rounded-lg font-bold text-sm hover:from-blue-600 hover:to-cyan-700 transition-all">
-                  {photoPreview ? 'Change Photo' : 'Choose Photo'}
-                </div>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handlePhotoChange}
-                  className="hidden"
-                />
-              </label>
+              {/* Two side-by-side buttons: gallery + camera */}
+              <div className="flex gap-2 w-full justify-center">
+                {/* Gallery picker */}
+                <label className="cursor-pointer flex-1">
+                  <div className="flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-blue-500 to-cyan-600 text-white rounded-lg font-bold text-sm hover:from-blue-600 hover:to-cyan-700 transition-all text-center">
+                    <Upload size={14} />
+                    {photoPreview ? 'Change' : 'Gallery'}
+                  </div>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handlePhotoChange}
+                    className="hidden"
+                  />
+                </label>
+                {/* Camera capture — opens rear camera on mobile */}
+                <label className="cursor-pointer flex-1">
+                  <div className="flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-lg font-bold text-sm hover:from-emerald-600 hover:to-teal-700 transition-all text-center">
+                    <Camera size={14} />
+                    Take Photo
+                  </div>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={handlePhotoChange}
+                    className="hidden"
+                  />
+                </label>
+              </div>
             </div>
           </div>
         </div>
