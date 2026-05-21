@@ -496,12 +496,16 @@ export default function Dashboard() {
       (error) => {
         console.error("Geolocation error:", error)
         if (notify) showNotification("error", "Unable to get location: " + error.message)
-        stopLiveTracking()
+        // Only stop tracking on permission denied (code 1) — fatal, user blocked GPS.
+        // Timeout (code 3) and position unavailable (code 2) are temporary; keep watching.
+        if (error.code === 1) {
+          stopLiveTracking()
+        }
       },
       {
         enableHighAccuracy: true,
         maximumAge: 0,
-        timeout: 20000
+        timeout: 30000
       }
     )
 
@@ -3503,11 +3507,11 @@ function EnhancedSaleForm({ onClose }) {
       newErrors.productName = "Product name is required"
     }
 
-    if (formData.quantity <= 0) {
+    if (!formData.quantity || Number(formData.quantity) <= 0) {
       newErrors.quantity = "Quantity must be greater than 0"
     }
 
-    if (formData.price <= 0) {
+    if (!formData.price || Number(formData.price) <= 0) {
       newErrors.price = "Price must be greater than 0"
     }
 
@@ -3664,8 +3668,9 @@ function EnhancedSaleForm({ onClose }) {
             <input
               type="number"
               min="1"
+              placeholder="Enter quantity"
               value={formData.quantity}
-              onChange={e => setFormData({ ...formData, quantity: parseInt(e.target.value) || 1 })}
+              onChange={e => setFormData({ ...formData, quantity: e.target.value })}
               className={`w-full px-3 sm:px-4 py-2 sm:py-3 border-2 rounded-lg sm:rounded-xl focus:ring-2 outline-none transition-all ${errors.quantity
                 ? 'border-red-500 focus:border-red-500 focus:ring-red-200'
                 : 'border-gray-300 focus:border-blue-500 focus:ring-blue-200'
@@ -3682,7 +3687,7 @@ function EnhancedSaleForm({ onClose }) {
               min="0"
               step="0.01"
               value={formData.price}
-              onChange={e => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
+              onChange={e => setFormData({ ...formData, price: e.target.value === '' ? '' : e.target.value })}
               placeholder="Per unit"
               className={`w-full px-3 sm:px-4 py-2 sm:py-3 border-2 rounded-lg sm:rounded-xl focus:ring-2 outline-none transition-all ${errors.price
                 ? 'border-red-500 focus:border-red-500 focus:ring-red-200'
