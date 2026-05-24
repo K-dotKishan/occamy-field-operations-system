@@ -2258,6 +2258,8 @@ function ProductCard({ product, onOrder, delay = 0 }) {
 
 /* ================= ORDER ITEM COMPONENT ================= */
 function OrderItem({ order, delay = 0 }) {
+  const [showDetail, setShowDetail] = useState(false)
+
   const statusColors = {
     PENDING: 'bg-gradient-to-r from-yellow-100 to-amber-100 text-yellow-800',
     CONFIRMED: 'bg-gradient-to-r from-blue-100 to-cyan-100 text-blue-800',
@@ -2274,24 +2276,103 @@ function OrderItem({ order, delay = 0 }) {
     CANCELLED: '[X]'
   }
 
+  // Fix NaN: totalAmount from DB, fallback to quantity * pricePerUnit, then quantity * price
+  const displayTotal = order.totalAmount
+    || (order.quantity && order.pricePerUnit ? order.quantity * order.pricePerUnit : null)
+    || (order.quantity && order.price ? order.quantity * order.price : 0)
+
   return (
-    <div
-      style={{ animationDelay: `${delay}ms` }}
-      className="animate-fadeIn"
-    >
-      <div className="flex justify-between items-center p-3 sm:p-4 bg-gradient-to-r from-white to-gray-50 rounded-lg hover:shadow-lg transition-all duration-300 transform hover:-translate-y-0.5 border border-gray-200">
-        <div className="flex-1 min-w-0">
-          <p className="font-bold text-gray-800 text-sm truncate">{order.productName}</p>
-          <p className="text-xs text-gray-600 mt-1">
-            Qty: {order.quantity} x Rs.{order.price}
-          </p>
-          <p className="text-xs text-gray-400 mt-1">{new Date(order.createdAt).toLocaleDateString()}</p>
+    <>
+      <div
+        style={{ animationDelay: `${delay}ms` }}
+        className="animate-fadeIn cursor-pointer"
+        onClick={() => setShowDetail(true)}
+      >
+        <div className="flex justify-between items-center p-3 sm:p-4 bg-gradient-to-r from-white to-gray-50 rounded-lg hover:shadow-lg transition-all duration-300 transform hover:-translate-y-0.5 border border-gray-200">
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-gray-800 text-sm truncate">{order.productName}</p>
+            <p className="text-xs text-gray-600 mt-1">
+              Qty: {order.quantity} × Rs.{order.pricePerUnit || order.price || 0}
+            </p>
+            <p className="text-xs text-gray-400 mt-1">{new Date(order.createdAt).toLocaleDateString()}</p>
+          </div>
+          <div className="flex flex-col items-end gap-1 ml-3">
+            <span className={`px-3 py-1.5 rounded-full text-xs font-bold ${statusColors[order.status] || 'bg-gray-100 text-gray-700'} shadow-sm`}>
+              {statusIcons[order.status]} {order.status}
+            </span>
+            <p className="text-sm font-bold text-gray-800">Rs.{displayTotal.toLocaleString()}</p>
+          </div>
         </div>
-        <div className="flex flex-col items-end gap-1 ml-3">
-          <span className={`px-3 py-1.5 rounded-full text-xs font-bold ${statusColors[order.status]} shadow-sm`}>
-            {statusIcons[order.status]} {order.status}
-          </span>
-          <p className="text-sm font-bold text-gray-800">Rs.{order.quantity * order.price}</p>
+      </div>
+
+      {/* Order Detail Modal */}
+      {showDetail && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4" onClick={() => setShowDetail(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="sticky top-0 bg-white border-b border-gray-200 p-5 flex justify-between items-center rounded-t-2xl">
+              <h3 className="text-lg font-black text-gray-800">Order Details</h3>
+              <button onClick={() => setShowDetail(false)} className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100">
+                <X size={22} />
+              </button>
+            </div>
+            <div className="p-5 space-y-3">
+              {/* Status badge */}
+              <div className="flex justify-center mb-2">
+                <span className={`px-4 py-2 rounded-full text-sm font-bold ${statusColors[order.status] || 'bg-gray-100 text-gray-700'}`}>
+                  {order.status}
+                </span>
+              </div>
+              {/* Detail rows */}
+              {[
+                ['Product', order.productName],
+                ['SKU', order.productSKU],
+                ['Pack Size', order.packSize],
+                ['Quantity', order.quantity],
+                ['Price / Unit', order.pricePerUnit || order.price ? `Rs.${order.pricePerUnit || order.price}` : null],
+                ['Total Amount', `Rs.${displayTotal.toLocaleString()}`],
+                ['Payment', order.paymentMode || order.paymentMethod],
+                ['Payment Status', order.paymentStatus],
+                ['Customer Name', order.customerName],
+                ['Phone', order.phoneNumber],
+                ['Delivery Address', order.deliveryAddress],
+                ['Order Date', new Date(order.createdAt).toLocaleString()],
+              ].filter(([, v]) => v).map(([label, value]) => (
+                <div key={label} className="flex justify-between py-2 border-b border-gray-100 last:border-0">
+                  <span className="text-sm text-gray-500 font-medium">{label}</span>
+                  <span className="text-sm font-bold text-gray-800 text-right max-w-xs">{value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
+/* ================= QR SCANNER VIEW ================= */
+function QRScannerView() {
+  const videoRef = useRef(null)
+  useEffect(() => {
+    const el = videoRef.current
+    if (!el) return
+    let stream = null
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+        .then(s => { stream = s; el.srcObject = s })
+        .catch(() => {})
+    }
+    return () => { if (stream) stream.getTracks().forEach(t => t.stop()) }
+  }, [])
+  return (
+    <div className="relative w-full max-w-xs mx-auto rounded-xl overflow-hidden bg-black" style={{ aspectRatio: '1' }}>
+      <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <div className="relative w-40 h-40 border-4 border-blue-400 rounded-lg opacity-80">
+          <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-blue-500 rounded-tl-lg" />
+          <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-blue-500 rounded-tr-lg" />
+          <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-blue-500 rounded-bl-lg" />
+          <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-blue-500 rounded-br-lg" />
         </div>
       </div>
     </div>
@@ -2303,16 +2384,18 @@ function EnhancedOrderModal({ product, onClose, onSuccess }) {
   const [quantity, setQuantity] = useState(1)
   const [address, setAddress] = useState("")
   const [phone, setPhone] = useState("")
+  const [customerName, setCustomerName] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [step, setStep] = useState(1)
   const [paymentMethod, setPaymentMethod] = useState("COD")
+  const [showScanner, setShowScanner] = useState(false)
 
-  const total = product.price * quantity
+  const total = product.price * (parseInt(quantity) || 0)
 
   const handleSubmit = async () => {
-    if (!address || !phone) {
-      setError("Please fill in all fields")
+    if (!address || !phone || !customerName) {
+      setError("Please fill in all fields including customer name")
       return
     }
 
@@ -2329,9 +2412,10 @@ function EnhancedOrderModal({ product, onClose, onSuccess }) {
       const orderData = {
         productId: product._id,
         productName: product.name,
-        quantity,
+        quantity: parseInt(quantity) || 1,
         deliveryAddress: address,
         phoneNumber: phone,
+        customerName,
         paymentMethod,
         totalAmount: total
       }
@@ -2448,9 +2532,9 @@ function EnhancedOrderModal({ product, onClose, onSuccess }) {
                 <label className="block text-sm font-bold text-gray-700 mb-3">Quantity</label>
                 <div className="flex items-center gap-3">
                   <button
-                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                    onClick={() => setQuantity(q => Math.max(1, (parseInt(q) || 1) - 1))}
                     className="w-12 h-12 bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl flex items-center justify-center text-gray-600 hover:from-gray-200 hover:to-gray-300 transition-all active:scale-95 shadow-sm"
-                    disabled={quantity <= 1}
+                    disabled={(parseInt(quantity) || 1) <= 1}
                   >
                     <span className="text-2xl font-bold">-</span>
                   </button>
@@ -2460,15 +2544,19 @@ function EnhancedOrderModal({ product, onClose, onSuccess }) {
                       min="1"
                       max={product.quantity}
                       value={quantity}
-                      onChange={(e) => setQuantity(Math.max(1, Math.min(product.quantity, parseInt(e.target.value) || 1)))}
+                      onChange={(e) => setQuantity(e.target.value === '' ? '' : e.target.value)}
+                      onBlur={(e) => {
+                        const v = parseInt(e.target.value) || 1
+                        setQuantity(Math.max(1, Math.min(product.quantity, v)))
+                      }}
                       className="w-full text-center px-4 py-3 text-2xl font-bold border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all"
                     />
                     <p className="text-xs text-gray-500 mt-1">Max: {product.quantity} units</p>
                   </div>
                   <button
-                    onClick={() => setQuantity(Math.min(product.quantity, quantity + 1))}
+                    onClick={() => setQuantity(q => Math.min(product.quantity, (parseInt(q) || 1) + 1))}
                     className="w-12 h-12 bg-gradient-to-br from-blue-100 to-cyan-200 rounded-xl flex items-center justify-center text-blue-700 hover:from-blue-200 hover:to-cyan-300 transition-all active:scale-95 shadow-sm"
-                    disabled={quantity >= product.quantity}
+                    disabled={(parseInt(quantity) || 1) >= product.quantity}
                   >
                     <span className="text-2xl font-bold">+</span>
                   </button>
@@ -2478,28 +2566,9 @@ function EnhancedOrderModal({ product, onClose, onSuccess }) {
               {/* Payment Method */}
               <div className="mb-6">
                 <label className="block text-sm font-bold text-gray-700 mb-3">Payment Method</label>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                <div className="grid grid-cols-2 gap-4 mb-4">
                   <button
-                    onClick={() => navigate('/admin/field-officers')}
-                    className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-all flex flex-col items-center gap-2 group"
-                  >
-                    <div className="bg-blue-50 p-3 rounded-full group-hover:bg-blue-100 transition-colors">
-                      <Users size={24} className="text-blue-600" />
-                    </div>
-                    <span className="font-semibold text-gray-700 text-sm">Field Officers</span>
-                  </button>
-
-                  <button
-                    onClick={() => navigate('/admin-charts')}
-                    className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-all flex flex-col items-center gap-2 group"
-                  >
-                    <div className="bg-green-50 p-3 rounded-full group-hover:bg-green-100 transition-colors">
-                      <BarChart3 size={24} className="text-green-600" />
-                    </div>
-                    <span className="font-semibold text-gray-700 text-sm">Analytics</span>
-                  </button>
-                  <button
-                    onClick={() => setPaymentMethod("COD")}
+                    onClick={() => { setPaymentMethod("COD"); setShowScanner(false) }}
                     className={`p-4 rounded-xl border-2 transition-all duration-300 flex flex-col items-center gap-2 ${paymentMethod === "COD"
                       ? 'border-blue-500 bg-gradient-to-r from-blue-50 to-cyan-50'
                       : 'border-gray-200 hover:border-blue-300'
@@ -2509,7 +2578,7 @@ function EnhancedOrderModal({ product, onClose, onSuccess }) {
                     <span className="font-bold text-sm">Cash on Delivery</span>
                   </button>
                   <button
-                    onClick={() => setPaymentMethod("ONLINE")}
+                    onClick={() => { setPaymentMethod("ONLINE"); setShowScanner(true) }}
                     className={`p-4 rounded-xl border-2 transition-all duration-300 flex flex-col items-center gap-2 ${paymentMethod === "ONLINE"
                       ? 'border-blue-500 bg-gradient-to-r from-blue-50 to-cyan-50'
                       : 'border-gray-200 hover:border-blue-300'
@@ -2519,10 +2588,40 @@ function EnhancedOrderModal({ product, onClose, onSuccess }) {
                     <span className="font-bold text-sm">Online Payment</span>
                   </button>
                 </div>
+
+                {/* QR Scanner — shown when Online Payment is selected */}
+                {paymentMethod === "ONLINE" && showScanner && (
+                  <div className="border-2 border-blue-300 rounded-xl p-4 bg-blue-50 text-center">
+                    <p className="text-sm font-bold text-blue-800 mb-3">Scan Payment QR Code</p>
+                    <p className="text-xs text-blue-600 mb-3">Use your device camera to scan the merchant QR code</p>
+                    <QRScannerView />
+                    <button
+                      onClick={() => setShowScanner(false)}
+                      className="mt-3 text-xs text-blue-600 font-bold underline"
+                    >
+                      Close Scanner
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Contact Info */}
               <div className="space-y-4 mb-6">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">
+                    Customer Name <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <User className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                    <input
+                      type="text"
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      placeholder="Enter your full name"
+                      className="w-full pl-12 pr-4 py-3 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all"
+                    />
+                  </div>
+                </div>
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-2">
                     Phone Number <span className="text-red-500">*</span>
