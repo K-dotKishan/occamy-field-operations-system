@@ -39,7 +39,7 @@ import {
   Bell, Search, Sparkles, Zap, Target, Award, CheckCircle, AlertCircle,
   Navigation, Satellite, Layers, Eye, EyeOff, RefreshCw, Globe,
   Phone, Mail, Clock, DollarSign, Truck, CreditCard, Shield, Star,
-  Camera, Upload, FileImage, Activity, Map
+  Camera, Upload, FileImage, Activity, Map, ArrowLeft
 } from "lucide-react"
 import {
   BarChart,
@@ -96,9 +96,40 @@ export default function Dashboard() {
   const [mapZoom, setMapZoom] = useState(5)
   const [isMapFullscreen, setIsMapFullscreen] = useState(false)
 
-  // Photo state
-  const [photo, setPhoto] = useState(null)
-  const [photoPreview, setPhotoPreview] = useState(null)
+  // Photo state — array of {file, preview} for multi-photo support
+  const [photos, setPhotos] = useState([])
+
+  const handlePhotoChange = (e) => {
+    const newFiles = Array.from(e.target.files)
+    e.target.value = ""
+    const newPreviews = newFiles.map(f => ({ file: f, preview: URL.createObjectURL(f) }))
+    setPhotos(prev => [...prev, ...newPreviews])
+  }
+
+  const removeSharedPhoto = (index) => {
+    setPhotos(prev => {
+      URL.revokeObjectURL(prev[index].preview)
+      return prev.filter((_, i) => i !== index)
+    })
+  }
+
+  const uploadPhotos = async () => {
+    if (photos.length === 0) return []
+    const urls = await Promise.all(photos.map(async ({ file }) => {
+      try {
+        const fd = new FormData()
+        fd.append("photo", file)
+        const res = await fetch(`${API_URL}/field/upload-photo`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+          body: fd
+        })
+        const data = await res.json()
+        return data.photoUrl || ""
+      } catch { return "" }
+    }))
+    return urls.filter(Boolean)
+  }
 
   // Field attendance states
   const [activeAttendance, setActiveAttendance] = useState(null)
@@ -386,38 +417,7 @@ export default function Dashboard() {
   }
 
   /* ================= PHOTO UPLOAD FUNCTIONS ================= */
-  const handlePhotoChange = (e) => {
-    const file = e.target.files[0]
-    if (file) {
-      setPhoto(file)
-      // Create preview
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setPhotoPreview(reader.result)
-      }
-      reader.readAsDataURL(file)
-    }
-  }
-
-  const uploadPhoto = async () => {
-    if (!photo) return ""
-
-    try {
-      const formData = new FormData()
-      formData.append("photo", photo)
-
-      const res = await fetch(`${API_URL}/field/upload-photo`, {
-        method: "POST",
-        body: formData
-      })
-
-      const data = await res.json()
-      return data.photoUrl || ""
-    } catch (error) {
-      console.error("Photo upload failed:", error)
-      return ""
-    }
-  }
+  // Now handled inline per-form above
 
   /* ================= LIVE TRACKING FUNCTIONS ================= */
   const startLiveTracking = (notify = true) => {
@@ -1932,10 +1932,18 @@ export default function Dashboard() {
             {activeTab === 'orders' && (
               <div className="bg-gradient-to-br from-white to-gray-50 rounded-2xl sm:rounded-3xl shadow-md hover:shadow-xl transition-all duration-300 p-4 sm:p-8 border border-gray-100 animate-fadeIn">
                 <div className="flex items-center justify-between mb-4 sm:mb-6">
-                  <h3 className="text-xl sm:text-2xl font-black text-gray-800 flex items-center gap-2">
-                    <Sparkles size={20} className="text-blue-500 animate-spin-slow" />
-                    My Orders
-                  </h3>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => setActiveTab('dashboard')}
+                      className="flex items-center gap-1 text-sm font-bold text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-3 py-1.5 rounded-xl border border-blue-200 transition-all"
+                    >
+                      <ArrowLeft size={15} /> Back
+                    </button>
+                    <h3 className="text-xl sm:text-2xl font-black text-gray-800 flex items-center gap-2">
+                      <Sparkles size={20} className="text-blue-500 animate-spin-slow" />
+                      My Orders
+                    </h3>
+                  </div>
                   <span className="text-xs px-3 py-1 bg-gradient-to-r from-blue-100 to-cyan-100 text-blue-700 rounded-full font-bold animate-pulse">
                     {orders.length} total
                   </span>
@@ -2891,8 +2899,28 @@ function EnhancedFieldMeetingOne({ onClose }) {
   const [personName, setPersonName] = useState("")
   const [phone, setPhone] = useState("")
   const [loading, setLoading] = useState(false)
-  const [photo, setPhoto] = useState(null)
-  const [photoPreview, setPhotoPreview] = useState(null)
+  const [meetingPhotos, setMeetingPhotos] = useState([]) // {file, preview}
+
+  const handlePhotoChange = (e) => {
+    const files = Array.from(e.target.files); e.target.value = ""
+    setMeetingPhotos(prev => [...prev, ...files.map(f => ({ file: f, preview: URL.createObjectURL(f) }))])
+  }
+  const removePhoto = (i) => setMeetingPhotos(prev => { URL.revokeObjectURL(prev[i].preview); return prev.filter((_, idx) => idx !== i) })
+  const uploadMeetingPhotos = async () => {
+    if (!meetingPhotos.length) return []
+    const urls = await Promise.all(meetingPhotos.map(async ({ file }) => {
+      try {
+        const fd = new FormData(); fd.append("photo", file)
+        const res = await fetch(`${API_URL}/field/upload-photo`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+          body: fd
+        })
+        const d = await res.json(); return d.photoUrl || ""
+      } catch { return "" }
+    }))
+    return urls.filter(Boolean)
+  }
 
   // Dynamic Fields State
   const [landSize, setLandSize] = useState("")
@@ -2906,39 +2934,6 @@ function EnhancedFieldMeetingOne({ onClose }) {
   const [productSampleAvailable, setProductSampleAvailable] = useState(false)
   const [productSampleGiven, setProductSampleGiven] = useState(false)
 
-  const handlePhotoChange = (e) => {
-    const file = e.target.files[0]
-    if (file) {
-      setPhoto(file)
-      // Create preview
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setPhotoPreview(reader.result)
-      }
-      reader.readAsDataURL(file)
-    }
-  }
-
-  const uploadPhoto = async () => {
-    if (!photo) return ""
-
-    try {
-      const formData = new FormData()
-      formData.append("photo", photo)
-
-      const res = await fetch(`${API_URL}/field/upload-photo`, {
-        method: "POST",
-        body: formData
-      })
-
-      const data = await res.json()
-      return data.photoUrl || ""
-    } catch (error) {
-      console.error("Photo upload failed:", error)
-      return ""
-    }
-  }
-
   const submit = async () => {
     if (!personName.trim()) {
       showNotification("error", "Please enter name")
@@ -2950,11 +2945,8 @@ function EnhancedFieldMeetingOne({ onClose }) {
     try {
       const position = await getLocation()
 
-      // Upload photo if exists
-      let photoUrl = ""
-      if (photo) {
-        photoUrl = await uploadPhoto()
-      }
+      // Upload photos if any
+      const photoUrls = await uploadMeetingPhotos()
 
       const meetingData = {
         type: "ONE_TO_ONE",
@@ -2967,7 +2959,8 @@ function EnhancedFieldMeetingOne({ onClose }) {
           accuracy: position.accuracy
         },
         notes: notes.trim() || undefined,
-        photoUrl: photoUrl || undefined,
+        photoUrl: photoUrls[0] || undefined,
+        photos: photoUrls,
         timestamp: new Date().toISOString(),
 
         // Dynamic Fields
@@ -2990,8 +2983,7 @@ function EnhancedFieldMeetingOne({ onClose }) {
       setNotes("")
       setPersonName("")
       setPhone("")
-      setPhoto(null)
-      setPhotoPreview(null)
+      setMeetingPhotos([])
       setLoading(false)
       onClose()
     } catch (error) {
@@ -3201,47 +3193,43 @@ function EnhancedFieldMeetingOne({ onClose }) {
         )}
 
         <div>
-          <label className="block text-sm font-bold text-gray-700 mb-2">Meeting Photo</label>
-          <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 transition-all hover:border-indigo-500 focus-within:border-indigo-500">
-            <div className="flex flex-col items-center justify-center gap-3">
-              {photoPreview ? (
-                <div className="relative w-full">
-                  <img
-                    src={photoPreview}
-                    alt="Preview"
-                    className="w-full h-48 object-cover rounded-lg"
-                  />
-                  <button
-                    onClick={() => {
-                      setPhoto(null)
-                      setPhotoPreview(null)
-                    }}
-                    className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full hover:bg-red-600 transition-colors"
-                  >
-                    <X size={16} />
-                  </button>
+          <label className="block text-sm font-bold text-gray-700 mb-2">
+            Meeting Photos {meetingPhotos.length > 0 && <span className="text-indigo-600 font-normal">— {meetingPhotos.length} selected</span>}
+          </label>
+          <div className="border-2 border-dashed border-gray-300 rounded-xl p-3 transition-all hover:border-indigo-500">
+            {meetingPhotos.length === 0 && (
+              <div className="flex flex-col items-center gap-1 py-2">
+                <Camera size={28} className="text-gray-400" />
+                <p className="text-xs text-gray-500">Multiple photos allowed · JPG, PNG, WEBP</p>
+              </div>
+            )}
+            <div className="flex gap-2 justify-center mt-2">
+              <label className="cursor-pointer flex-1">
+                <div className="flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg font-bold text-sm hover:from-indigo-600 hover:to-purple-700 transition-all text-center">
+                  <Upload size={14} />Gallery
                 </div>
-              ) : (
-                <>
-                  <Camera size={32} className="text-gray-400" />
-                  <div className="text-center">
-                    <p className="text-sm text-gray-600 mb-1">Click to upload meeting photo</p>
-                    <p className="text-xs text-gray-500">Supports JPG, PNG, WEBP</p>
-                  </div>
-                </>
-              )}
-              <label className="cursor-pointer">
-                <div className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg font-bold text-sm hover:from-indigo-600 hover:to-purple-700 transition-all">
-                  {photoPreview ? 'Change Photo' : 'Choose Photo'}
+                <input type="file" accept="image/*" multiple onChange={handlePhotoChange} className="hidden" />
+              </label>
+              <label className="cursor-pointer flex-1">
+                <div className="flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-lg font-bold text-sm hover:from-emerald-600 hover:to-teal-700 transition-all text-center">
+                  <Camera size={14} />Take Photo
                 </div>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handlePhotoChange}
-                  className="hidden"
-                />
+                <input type="file" accept="image/*" capture="environment" onChange={handlePhotoChange} className="hidden" />
               </label>
             </div>
+            {meetingPhotos.length > 0 && (
+              <div className="grid grid-cols-3 gap-2 mt-3">
+                {meetingPhotos.map((p, i) => (
+                  <div key={i} className="relative rounded-lg overflow-hidden" style={{ aspectRatio: '1' }}>
+                    <img src={p.preview} alt={`photo-${i}`} className="w-full h-full object-cover" />
+                    <button type="button" onClick={() => removePhoto(i)}
+                      className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-0.5 hover:bg-red-600 transition-colors">
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -3286,8 +3274,28 @@ function EnhancedFieldMeetingGroup({ onClose }) {
   const [productSampleAvailable, setProductSampleAvailable] = useState(false)
   const [productSampleGiven, setProductSampleGiven] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [photo, setPhoto] = useState(null)
-  const [photoPreview, setPhotoPreview] = useState(null)
+  const [groupPhotos, setGroupPhotos] = useState([]) // {file, preview}
+
+  const handlePhotoChange = (e) => {
+    const files = Array.from(e.target.files); e.target.value = ""
+    setGroupPhotos(prev => [...prev, ...files.map(f => ({ file: f, preview: URL.createObjectURL(f) }))])
+  }
+  const removePhoto = (i) => setGroupPhotos(prev => { URL.revokeObjectURL(prev[i].preview); return prev.filter((_, idx) => idx !== i) })
+  const uploadGroupPhotos = async () => {
+    if (!groupPhotos.length) return []
+    const urls = await Promise.all(groupPhotos.map(async ({ file }) => {
+      try {
+        const fd = new FormData(); fd.append("photo", file)
+        const res = await fetch(`${API_URL}/field/upload-photo`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+          body: fd
+        })
+        const d = await res.json(); return d.photoUrl || ""
+      } catch { return "" }
+    }))
+    return urls.filter(Boolean)
+  }
 
   // Categories that require an Entity Name field
   const ENTITY_CATEGORIES = ["DAIRY_COLLECTION_CENTER", "RETAIL_OUTLET", "KVK", "FPO"]
@@ -3297,33 +3305,6 @@ function EnhancedFieldMeetingGroup({ onClose }) {
     KVK: "Enter KVK Name",
     FPO: "Enter FPO Name"
   }[category] || "Enter Entity Name"
-
-  const handlePhotoChange = (e) => {
-    const file = e.target.files[0]
-    if (file) {
-      setPhoto(file)
-      const reader = new FileReader()
-      reader.onloadend = () => { setPhotoPreview(reader.result) }
-      reader.readAsDataURL(file)
-    }
-  }
-
-  const uploadPhoto = async () => {
-    if (!photo) return ""
-    try {
-      const formData = new FormData()
-      formData.append("photo", photo)
-      const res = await fetch(`${API_URL}/field/upload-photo`, {
-        method: "POST",
-        body: formData
-      })
-      const data = await res.json()
-      return data.photoUrl || ""
-    } catch (error) {
-      console.error("Photo upload failed:", error)
-      return ""
-    }
-  }
 
   const submit = async () => {
     if (!village.trim()) {
@@ -3339,8 +3320,7 @@ function EnhancedFieldMeetingGroup({ onClose }) {
     try {
       const position = await getLocation()
 
-      let photoUrl = ""
-      if (photo) { photoUrl = await uploadPhoto() }
+      const photoUrls = await uploadGroupPhotos()
 
       const meetingData = {
         type: "GROUP",
@@ -3355,7 +3335,8 @@ function EnhancedFieldMeetingGroup({ onClose }) {
           lng: position.lng,
           accuracy: position.accuracy
         },
-        photoUrl: photoUrl || undefined,
+        photoUrl: photoUrls[0] || undefined,
+        photos: photoUrls,
         timestamp: new Date().toISOString(),
         productSampleAvailable,
         productSampleGiven,
@@ -3366,7 +3347,7 @@ function EnhancedFieldMeetingGroup({ onClose }) {
       showNotification("success", "Group meeting logged successfully!")
       setVillage(""); setCount(0); setTopic(""); setEntityName("")
       setProductSampleAvailable(false); setProductSampleGiven(false)
-      setPhoto(null); setPhotoPreview(null)
+      setGroupPhotos([])
       setLoading(false)
       onClose()
     } catch (error) {
@@ -3492,35 +3473,43 @@ function EnhancedFieldMeetingGroup({ onClose }) {
 
         {/* Photo upload */}
         <div>
-          <label className="block text-sm font-bold text-gray-700 mb-2">Meeting Photo</label>
-          <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 transition-all hover:border-purple-500 focus-within:border-purple-500">
-            <div className="flex flex-col items-center justify-center gap-3">
-              {photoPreview ? (
-                <div className="relative w-full">
-                  <img src={photoPreview} alt="Preview" className="w-full h-48 object-cover rounded-lg" />
-                  <button
-                    onClick={() => { setPhoto(null); setPhotoPreview(null) }}
-                    className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full hover:bg-red-600 transition-colors"
-                  >
-                    <X size={16} />
-                  </button>
+          <label className="block text-sm font-bold text-gray-700 mb-2">
+            Meeting Photos {groupPhotos.length > 0 && <span className="text-purple-600 font-normal">— {groupPhotos.length} selected</span>}
+          </label>
+          <div className="border-2 border-dashed border-gray-300 rounded-xl p-3 transition-all hover:border-purple-500">
+            {groupPhotos.length === 0 && (
+              <div className="flex flex-col items-center gap-1 py-2">
+                <Camera size={28} className="text-gray-400" />
+                <p className="text-xs text-gray-500">Multiple photos allowed · JPG, PNG, WEBP</p>
+              </div>
+            )}
+            <div className="flex gap-2 justify-center mt-2">
+              <label className="cursor-pointer flex-1">
+                <div className="flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-lg font-bold text-sm hover:from-purple-600 hover:to-pink-700 transition-all text-center">
+                  <Upload size={14} />Gallery
                 </div>
-              ) : (
-                <>
-                  <Camera size={32} className="text-gray-400" />
-                  <div className="text-center">
-                    <p className="text-sm text-gray-600 mb-1">Click to upload group photo</p>
-                    <p className="text-xs text-gray-500">Supports JPG, PNG, WEBP</p>
-                  </div>
-                </>
-              )}
-              <label className="cursor-pointer">
-                <div className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-lg font-bold text-sm hover:from-purple-600 hover:to-pink-700 transition-all">
-                  {photoPreview ? 'Change Photo' : 'Choose Photo'}
+                <input type="file" accept="image/*" multiple onChange={handlePhotoChange} className="hidden" />
+              </label>
+              <label className="cursor-pointer flex-1">
+                <div className="flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-lg font-bold text-sm hover:from-emerald-600 hover:to-teal-700 transition-all text-center">
+                  <Camera size={14} />Take Photo
                 </div>
-                <input type="file" accept="image/*" onChange={handlePhotoChange} className="hidden" />
+                <input type="file" accept="image/*" capture="environment" onChange={handlePhotoChange} className="hidden" />
               </label>
             </div>
+            {groupPhotos.length > 0 && (
+              <div className="grid grid-cols-3 gap-2 mt-3">
+                {groupPhotos.map((p, i) => (
+                  <div key={i} className="relative rounded-lg overflow-hidden" style={{ aspectRatio: '1' }}>
+                    <img src={p.preview} alt={`photo-${i}`} className="w-full h-full object-cover" />
+                    <button type="button" onClick={() => removePhoto(i)}
+                      className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-0.5 hover:bg-red-600 transition-colors">
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -3560,43 +3549,47 @@ function EnhancedSaleForm({ onClose }) {
   })
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState({})
-  const [photo, setPhoto] = useState(null)
+  const [photos, setPhotos] = useState([])          // array of { file, preview }
   const [showPreview, setShowPreview] = useState(false)
-  const [photoPreview, setPhotoPreview] = useState(null)
 
   const totalAmount = formData.quantity * formData.price
 
   const handlePhotoChange = (e) => {
-    const file = e.target.files[0]
-    if (file) {
-      setPhoto(file)
-      // Create preview
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setPhotoPreview(reader.result)
-      }
-      reader.readAsDataURL(file)
-    }
+    const files = Array.from(e.target.files)
+    const newPhotos = files.map(file => ({
+      file,
+      preview: URL.createObjectURL(file)
+    }))
+    setPhotos(prev => [...prev, ...newPhotos])
+    // reset input so same file can be re-selected if removed
+    e.target.value = ""
   }
 
-  const uploadPhoto = async () => {
-    if (!photo) return ""
+  const removePhoto = (index) => {
+    setPhotos(prev => {
+      URL.revokeObjectURL(prev[index].preview)
+      return prev.filter((_, i) => i !== index)
+    })
+  }
 
-    try {
-      const formData = new FormData()
-      formData.append("photo", photo)
-
-      const res = await fetch(`${API_URL}/field/upload-photo`, {
-        method: "POST",
-        body: formData
-      })
-
-      const data = await res.json()
-      return data.photoUrl || ""
-    } catch (error) {
-      console.error("Photo upload failed:", error)
-      return ""
-    }
+  const uploadPhotos = async () => {
+    if (photos.length === 0) return []
+    const urls = await Promise.all(photos.map(async ({ file }) => {
+      try {
+        const fd = new FormData()
+        fd.append("photo", file)
+        const res = await fetch(`${API_URL}/field/upload-photo`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+          body: fd
+        })
+        const data = await res.json()
+        return data.photoUrl || ""
+      } catch {
+        return ""
+      }
+    }))
+    return urls.filter(Boolean)
   }
 
   const validateForm = () => {
@@ -3638,11 +3631,8 @@ function EnhancedSaleForm({ onClose }) {
     try {
       const position = await getLocation()
 
-      // Upload photo if exists
-      let photoUrl = ""
-      if (photo) {
-        photoUrl = await uploadPhoto()
-      }
+      // Upload photos if any
+      const photoUrls = await uploadPhotos()
 
       const saleData = {
         ...formData,
@@ -3652,7 +3642,8 @@ function EnhancedSaleForm({ onClose }) {
           lng: position.lng,
           accuracy: position.accuracy
         },
-        photoUrl: photoUrl || undefined,
+        photoUrl: photoUrls[0] || undefined,
+        photos: photoUrls,
         timestamp: new Date().toISOString()
       }
 
@@ -3675,8 +3666,7 @@ function EnhancedSaleForm({ onClose }) {
         notes: ""
       })
       setErrors({})
-      setPhoto(null)
-      setPhotoPreview(null)
+      setPhotos([])
       setLoading(false)
       onClose()
     } catch (error) {
@@ -3844,51 +3834,35 @@ function EnhancedSaleForm({ onClose }) {
         )}
 
         <div>
-          <label className="block text-sm font-bold text-gray-700 mb-2">Sale Photo (Optional)</label>
+          <label className="block text-sm font-bold text-gray-700 mb-2">
+            Sale Photos (Optional) {photos.length > 0 && <span className="text-blue-600 font-normal">— {photos.length} selected</span>}
+          </label>
           <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 transition-all hover:border-blue-500 focus-within:border-blue-500">
             <div className="flex flex-col items-center justify-center gap-3">
-              {photoPreview ? (
-                <div className="relative w-full">
-                  <img
-                    src={photoPreview}
-                    alt="Preview"
-                    className="w-full h-48 object-cover rounded-lg"
-                  />
-                  <button
-                    onClick={() => {
-                      setPhoto(null)
-                      setPhotoPreview(null)
-                    }}
-                    className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full hover:bg-red-600 transition-colors"
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
-              ) : (
+              {photos.length === 0 && (
                 <>
                   <Camera size={32} className="text-gray-400" />
                   <div className="text-center">
-                    <p className="text-sm text-gray-600 mb-1">Upload or capture a product photo</p>
-                    <p className="text-xs text-gray-500">Supports JPG, PNG, WEBP</p>
+                    <p className="text-sm text-gray-600 mb-1">Upload or capture product photos</p>
+                    <p className="text-xs text-gray-500">Multiple photos allowed · JPG, PNG, WEBP</p>
                   </div>
                 </>
               )}
               {/* Two side-by-side buttons: gallery + camera */}
               <div className="flex gap-2 w-full justify-center">
-                {/* Gallery picker */}
                 <label className="cursor-pointer flex-1">
                   <div className="flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-blue-500 to-cyan-600 text-white rounded-lg font-bold text-sm hover:from-blue-600 hover:to-cyan-700 transition-all text-center">
                     <Upload size={14} />
-                    {photoPreview ? 'Change' : 'Gallery'}
+                    Gallery
                   </div>
                   <input
                     type="file"
                     accept="image/*"
+                    multiple
                     onChange={handlePhotoChange}
                     className="hidden"
                   />
                 </label>
-                {/* Camera capture — opens rear camera on mobile */}
                 <label className="cursor-pointer flex-1">
                   <div className="flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-lg font-bold text-sm hover:from-emerald-600 hover:to-teal-700 transition-all text-center">
                     <Camera size={14} />
@@ -3904,6 +3878,23 @@ function EnhancedSaleForm({ onClose }) {
                 </label>
               </div>
             </div>
+            {/* Thumbnail grid */}
+            {photos.length > 0 && (
+              <div className="grid grid-cols-3 gap-2 mt-3">
+                {photos.map((p, i) => (
+                  <div key={i} className="relative rounded-lg overflow-hidden" style={{ aspectRatio: '1' }}>
+                    <img src={p.preview} alt={`photo-${i}`} className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => removePhoto(i)}
+                      className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-0.5 hover:bg-red-600 transition-colors"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -4005,7 +3996,7 @@ function EnhancedSaleForm({ onClose }) {
                 ['District', formData.district],
                 ['State', formData.state],
                 ['Notes', formData.notes],
-                photo ? ['Photo', '1 attached'] : null,
+                photos.length > 0 ? ['Photos', `${photos.length} attached`] : null,
               ].filter(r => r && r[1]).map(([label, value]) => (
                 <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #f1f5f9' }}>
                   <span style={{ fontSize: 13, color: '#64748b', fontWeight: 600 }}>{label}</span>
