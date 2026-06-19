@@ -785,20 +785,84 @@ function Textarea({ label, value, onChange, rows = 4 }) {
 }
 
 function FileUpload({ label, onChange, accept, multiple = false }) {
+  const [previews, setPreviews] = useState([])
+
+  const handleChange = (e) => {
+    const newFiles = Array.from(e.target.files)
+    e.target.value = "" // allow re-selecting same file
+    if (!multiple) {
+      // single mode — replace
+      const file = newFiles[0]
+      if (!file) return
+      setPreviews([{ file, url: URL.createObjectURL(file) }])
+      onChange([file])
+    } else {
+      // multi mode — append
+      const newPreviews = newFiles.map(f => ({ file: f, url: URL.createObjectURL(f) }))
+      setPreviews(prev => {
+        const updated = [...prev, ...newPreviews]
+        onChange(updated.map(p => p.file))
+        return updated
+      })
+    }
+  }
+
+  const remove = (index) => {
+    setPreviews(prev => {
+      URL.revokeObjectURL(prev[index].url)
+      const updated = prev.filter((_, i) => i !== index)
+      onChange(updated.map(p => p.file))
+      return updated
+    })
+  }
+
   return (
     <div>
-      <label className="block text-sm font-bold text-gray-700 mb-2">{label}</label>
-      <label className="flex items-center gap-3 px-4 py-3 border-2 border-dashed border-gray-300 rounded-xl hover:border-indigo-500 cursor-pointer transition-all">
-        <Upload size={20} className="text-gray-400" />
-        <span className="text-sm text-gray-600">Click to upload {multiple ? 'photos' : 'photo'}</span>
-        <input
-          type="file"
-          accept={accept}
-          multiple={multiple}
-          onChange={e => onChange(Array.from(e.target.files))}
-          className="hidden"
-        />
+      <label className="block text-sm font-bold text-gray-700 mb-2">
+        {label} {multiple && previews.length > 0 && <span className="text-indigo-600 font-normal">— {previews.length} selected</span>}
       </label>
+      <div className="border-2 border-dashed border-gray-300 rounded-xl p-3 hover:border-indigo-500 transition-all">
+        <div className="flex gap-2 justify-center">
+          {/* Gallery */}
+          <label className="cursor-pointer flex-1">
+            <div className="flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg font-bold text-sm hover:from-indigo-600 hover:to-purple-700 transition-all text-center">
+              <Upload size={14} />
+              Gallery
+            </div>
+            <input type="file" accept={accept} multiple={multiple} onChange={handleChange} className="hidden" />
+          </label>
+          {/* Camera — rear camera on mobile */}
+          <label className="cursor-pointer flex-1">
+            <div className="flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-lg font-bold text-sm hover:from-emerald-600 hover:to-teal-700 transition-all text-center">
+              <Camera size={14} />
+              Take Photo
+            </div>
+            <input type="file" accept={accept} capture="environment" onChange={handleChange} className="hidden" />
+          </label>
+        </div>
+        {/* Thumbnail grid */}
+        {previews.length > 0 && (
+          <div className="grid grid-cols-3 gap-2 mt-3">
+            {previews.map((p, i) => (
+              <div key={i} className="relative rounded-lg overflow-hidden" style={{ aspectRatio: '1' }}>
+                <img src={p.url} alt={`photo-${i}`} className="w-full h-full object-cover" />
+                <button
+                  type="button"
+                  onClick={() => remove(i)}
+                  className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-0.5 hover:bg-red-600 transition-colors"
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        {previews.length === 0 && (
+          <p className="text-xs text-center text-gray-400 mt-2">
+            {multiple ? 'Multiple photos allowed · JPG, PNG, WEBP' : 'JPG, PNG, WEBP'}
+          </p>
+        )}
+      </div>
     </div>
   )
 }
