@@ -1,8 +1,10 @@
 import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { api } from '../api'
 import occamyLogo from '../assets/occamylogo.jpg'
 import { TrendingUp, Package, LogOut, Menu, Navigation, Warehouse, Plus, X, RefreshCw } from 'lucide-react'
+import LanguageToggle from '../components/LanguageToggle'
 
 const MIN_DAY_HOURS = 7
 const C = { bg:'#FDF8E1', navy:'#3E3E5C', teal:'#4A6D7C', green:'#7FB069', card:'#FFFFFF', border:'#D8D5C5', muted:'#7A7490', inputBg:'#EAF1FF' }
@@ -28,6 +30,7 @@ const BS = { background:C.inputBg, color:C.navy, border:'1.5px solid '+C.border,
 
 export default function DistributorDashboard() {
   const navigate = useNavigate()
+  const { t, i18n } = useTranslation()
   const userName = localStorage.getItem('name') || 'Distributor'
   const [activeTab, setActiveTab] = useState('home')
   const [isMenuOpen, setIsMenuOpen] = useState(false)
@@ -225,9 +228,9 @@ export default function DistributorDashboard() {
   const logout = () => { stopTracking(); localStorage.clear(); navigate('/login') }
 
   const TABS = [
-    { id:'home', label:'Dashboard' },
-    { id:'inventory', label:'Inventory' },
-    { id:'sales', label:'Sales' },
+    { id:'home', label: t('nav.dashboard') },
+    { id:'inventory', label: t('nav.inventory') },
+    { id:'sales', label: t('nav.sales') },
   ]
 
   return (
@@ -246,7 +249,7 @@ export default function DistributorDashboard() {
             </div>
             <div>
               <div style={{ color:'#fff', fontWeight:900, fontSize:15, lineHeight:1.1 }}>OCCAMY BIOSCIENCE</div>
-              <div style={{ color:'rgba(255,255,255,.7)', fontSize:10, fontWeight:500 }}>Distributor Portal</div>
+              <div style={{ color:'rgba(255,255,255,.7)', fontSize:10, fontWeight:500 }}>{t('distributor.portal')}</div>
             </div>
           </div>
           <div style={{ display:'flex', alignItems:'center', gap:10 }}>
@@ -258,6 +261,7 @@ export default function DistributorDashboard() {
             <button onClick={logout} style={{ background:'#e53e3e', border:'none', borderRadius:'50%', width:36, height:36, cursor:'pointer', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center' }}>
               <LogOut size={16} />
             </button>
+            <LanguageToggle />
           </div>
         </div>
         {isMenuOpen && (
@@ -279,8 +283,8 @@ export default function DistributorDashboard() {
       {/* MAIN */}
       <main style={{ maxWidth:1200, margin:'0 auto', padding:'88px 16px 40px' }}>
         <div style={{ marginBottom:24 }}>
-          <h1 style={{ fontSize:26, fontWeight:900, color:C.navy, margin:0 }}>Welcome, {userName}</h1>
-          <p style={{ color:C.muted, fontSize:13, margin:'4px 0 0' }}>Distributor Portal &bull; Occamy Bioscience</p>
+          <h1 style={{ fontSize:26, fontWeight:900, color:C.navy, margin:0 }}>{t('common.welcome')}, {userName}</h1>
+          <p style={{ color:C.muted, fontSize:13, margin:'4px 0 0' }}>{t('distributor.portal')} &bull; Occamy Bioscience</p>
         </div>
 
         {/* TAB NAV */}
@@ -329,9 +333,9 @@ export default function DistributorDashboard() {
           <>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))', gap:14, marginBottom:24 }}>
               {[
-                { label:'TODAY SALES', value: stats?.sales ?? 0 },
-                { label:'REVENUE', value: 'Rs.' + (stats?.revenue ?? 0).toLocaleString() },
-                { label:'TOTAL STOCK', value: stats?.totalStock ?? 0 },
+                { label: t('distributor.todaySales'), value: stats?.sales ?? 0 },
+                { label: t('distributor.revenue'), value: 'Rs.' + (stats?.revenue ?? 0).toLocaleString() },
+                { label: t('distributor.totalStock'), value: stats?.totalStock ?? 0 },
               ].map(k => (
                 <div key={k.label} style={{ background:'linear-gradient(135deg,#3b758c 0%,#1797a6 100%)', borderRadius:16, padding:'18px 16px', boxShadow:'0 6px 20px rgba(59,117,140,.25)', color:'#fff' }}>
                   <div style={{ fontSize:10, fontWeight:700, opacity:.85, letterSpacing:.5, marginBottom:8 }}>{k.label}</div>
@@ -343,17 +347,17 @@ export default function DistributorDashboard() {
               <button onClick={() => { setActiveTab('inventory'); setShowInvForm(true) }}
                 style={{ background:'linear-gradient(135deg,#3b758c 0%,#1797a6 100%)', border:'none', borderRadius:16, padding:'18px 16px', cursor:'pointer', color:'#fff', display:'flex', flexDirection:'column', alignItems:'center', gap:8, fontFamily:'Poppins,sans-serif' }}>
                 <Warehouse size={28} />
-                <span style={{ fontWeight:700, fontSize:13 }}>Receive Stock</span>
-                <span style={{ fontSize:11, opacity:.8 }}>Record inward inventory</span>
+                <span style={{ fontWeight:700, fontSize:13 }}>{t('distributor.receiveStock')}</span>
+                <span style={{ fontSize:11, opacity:.8 }}>{t('distributor.receiveStock')}</span>
               </button>
               <button onClick={() => { setActiveTab('sales'); setShowSaleForm(true) }}
                 style={{ background:'linear-gradient(135deg,#3b758c 0%,#1797a6 100%)', border:'none', borderRadius:16, padding:'18px 16px', cursor:'pointer', color:'#fff', display:'flex', flexDirection:'column', alignItems:'center', gap:8, fontFamily:'Poppins,sans-serif' }}>
                 <TrendingUp size={28} />
-                <span style={{ fontWeight:700, fontSize:13 }}>Record Sale</span>
-                <span style={{ fontSize:11, opacity:.8 }}>B2B or B2C transaction</span>
+                <span style={{ fontWeight:700, fontSize:13 }}>{t('distributor.recordSale')}</span>
+                <span style={{ fontSize:11, opacity:.8 }}>B2B / B2C</span>
               </button>
             </div>
-            <SectionCard title="Recent Sales" onRefresh={loadAll}>
+            <SectionCard title={t('distributor.recentSales')} onRefresh={loadAll}>
               {sales.length === 0 && <EmptyRow msg="No sales recorded yet" />}
               {sales.slice(0,5).map(s => <SaleRow key={s._id} sale={s} />)}
             </SectionCard>
@@ -364,32 +368,32 @@ export default function DistributorDashboard() {
         {activeTab === 'inventory' && (
           <>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
-              <h2 style={{ fontSize:20, fontWeight:900, color:C.navy, margin:0 }}>Inventory Management</h2>
+              <h2 style={{ fontSize:20, fontWeight:900, color:C.navy, margin:0 }}>{t('distributor.inventoryMgmt')}</h2>
               <button onClick={() => setShowInvForm(!showInvForm)} style={{ background:C.navy, color:'#fff', border:'none', borderRadius:12, padding:'10px 18px', cursor:'pointer', fontFamily:'Poppins,sans-serif', fontWeight:700, fontSize:13, display:'flex', alignItems:'center', gap:6 }}>
-                <Plus size={16} /> Receive Stock
+                <Plus size={16} /> {t('distributor.receiveStock')}
               </button>
             </div>
             {showInvForm && (
               <div style={{ background:C.card, borderRadius:18, padding:24, marginBottom:20, boxShadow:'0 8px 32px rgba(62,62,92,.12)', border:'1.5px solid '+C.border }}>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:18 }}>
-                  <h3 style={{ margin:0, color:C.navy, fontWeight:800, fontSize:16 }}>Record Stock Received (Mall / Inward)</h3>
+                  <h3 style={{ margin:0, color:C.navy, fontWeight:800, fontSize:16 }}>{t('distributor.recordStockTitle')}</h3>
                   <button onClick={() => setShowInvForm(false)} style={{ background:'none', border:'none', cursor:'pointer', color:C.muted }}><X size={20} /></button>
                 </div>
                 <form onSubmit={submitInventory} style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))', gap:12 }}>
-                  <div><label style={LS}>Product Name *</label><input style={inp} onFocus={onF} onBlur={onB} placeholder="e.g. Occamy Bovicare" value={invForm.productName} onChange={e => setInvForm({...invForm, productName:e.target.value})} required /></div>
-                  <div><label style={LS}>SKU</label><input style={inp} onFocus={onF} onBlur={onB} placeholder="Product SKU" value={invForm.productSKU} onChange={e => setInvForm({...invForm, productSKU:e.target.value})} /></div>
-                  <div><label style={LS}>Pack Size</label><input style={inp} onFocus={onF} onBlur={onB} placeholder="e.g. 1kg, 5L" value={invForm.packSize} onChange={e => setInvForm({...invForm, packSize:e.target.value})} /></div>
-                  <div><label style={LS}>Quantity Received *</label><input style={inp} onFocus={onF} onBlur={onB} type="number" min="0.01" step="0.01" placeholder="Units received" value={invForm.quantityReceived} onChange={e => setInvForm({...invForm, quantityReceived:e.target.value})} required /></div>
-                  <div><label style={LS}>Price per Unit (Rs.)</label><input style={inp} onFocus={onF} onBlur={onB} type="number" min="0" step="0.01" placeholder="MRP / cost" value={invForm.pricePerUnit} onChange={e => setInvForm({...invForm, pricePerUnit:e.target.value})} /></div>
-                  <div><label style={LS}>Notes</label><input style={inp} onFocus={onF} onBlur={onB} placeholder="Optional notes" value={invForm.notes} onChange={e => setInvForm({...invForm, notes:e.target.value})} /></div>
+                  <div><label style={LS}>{t('distributor.productName')} *</label><input style={inp} onFocus={onF} onBlur={onB} placeholder={t('distributor.invProductNamePlaceholder')} value={invForm.productName} onChange={e => setInvForm({...invForm, productName:e.target.value})} required /></div>
+                  <div><label style={LS}>SKU</label><input style={inp} onFocus={onF} onBlur={onB} placeholder={t('distributor.invSKUPlaceholder')} value={invForm.productSKU} onChange={e => setInvForm({...invForm, productSKU:e.target.value})} /></div>
+                  <div><label style={LS}>{t('distributor.packSize')}</label><input style={inp} onFocus={onF} onBlur={onB} placeholder={t('distributor.invPackSizePlaceholder')} value={invForm.packSize} onChange={e => setInvForm({...invForm, packSize:e.target.value})} /></div>
+                  <div><label style={LS}>{t('distributor.quantity')} *</label><input style={inp} onFocus={onF} onBlur={onB} type="number" min="0.01" step="0.01" placeholder={t('distributor.invQtyPlaceholder')} value={invForm.quantityReceived} onChange={e => setInvForm({...invForm, quantityReceived:e.target.value})} required /></div>
+                  <div><label style={LS}>{t('distributor.pricePerUnit')}</label><input style={inp} onFocus={onF} onBlur={onB} type="number" min="0" step="0.01" placeholder={t('distributor.invPricePlaceholder')} value={invForm.pricePerUnit} onChange={e => setInvForm({...invForm, pricePerUnit:e.target.value})} /></div>
+                  <div><label style={LS}>{t('distributor.notes')}</label><input style={inp} onFocus={onF} onBlur={onB} placeholder={t('distributor.invNotesPlaceholder')} value={invForm.notes} onChange={e => setInvForm({...invForm, notes:e.target.value})} /></div>
                   <div style={{ gridColumn:'1 / -1', display:'flex', gap:10, justifyContent:'flex-end', marginTop:4 }}>
-                    <button type="button" onClick={() => setShowInvForm(false)} style={BS}>Cancel</button>
-                    <button type="submit" disabled={invLoading} style={{...BP, opacity: invLoading ? .7 : 1}}>{invLoading ? 'Saving...' : 'Save Stock'}</button>
+                    <button type="button" onClick={() => setShowInvForm(false)} style={BS}>{t('distributor.cancel')}</button>
+                    <button type="submit" disabled={invLoading} style={{...BP, opacity: invLoading ? .7 : 1}}>{invLoading ? t('common.saving') : t('distributor.saveStock')}</button>
                   </div>
                 </form>
               </div>
             )}
-            <SectionCard title="Current Inventory" onRefresh={loadAll}>
+            <SectionCard title={t('distributor.currentInventory')} onRefresh={loadAll}>
               {inventory.length === 0 && <EmptyRow msg="No inventory records yet. Click Receive Stock to add." />}
               {inventory.map(item => (
                 <div key={item._id} style={{ padding:'14px 18px', borderBottom:'1px solid '+C.border, display:'flex', flexWrap:'wrap', justifyContent:'space-between', alignItems:'center', gap:10 }}>
@@ -413,124 +417,60 @@ export default function DistributorDashboard() {
         {activeTab === 'sales' && (
           <>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
-              <h2 style={{ fontSize:20, fontWeight:900, color:C.navy, margin:0 }}>Sales Records</h2>
+              <h2 style={{ fontSize:20, fontWeight:900, color:C.navy, margin:0 }}>{t('distributor.salesRecords')}</h2>
               <button onClick={() => setShowSaleForm(!showSaleForm)} style={{ background:C.green, color:'#fff', border:'none', borderRadius:12, padding:'10px 18px', cursor:'pointer', fontFamily:'Poppins,sans-serif', fontWeight:700, fontSize:13, display:'flex', alignItems:'center', gap:6 }}>
-                <Plus size={16} /> Record Sale
+                <Plus size={16} /> {t('distributor.recordSaleBtn')}
               </button>
             </div>
             {showSaleForm && (
               <div style={{ background:C.card, borderRadius:18, padding:24, marginBottom:20, boxShadow:'0 8px 32px rgba(62,62,92,.12)', border:'1.5px solid '+C.border }}>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:18 }}>
-                  <h3 style={{ margin:0, color:C.navy, fontWeight:800, fontSize:16 }}>Record Sale Transaction</h3>
+                  <h3 style={{ margin:0, color:C.navy, fontWeight:800, fontSize:16 }}>{t('distributor.recordSaleTransaction')}</h3>
                   <button onClick={() => setShowSaleForm(false)} style={{ background:'none', border:'none', cursor:'pointer', color:C.muted }}><X size={20} /></button>
                 </div>
                 <form onSubmit={openSalePreview} style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))', gap:12 }}>
-                  <div><label style={LS}>Sale Type *</label>
+                  <div><label style={LS}>{t('distributor.saleType')} *</label>
                     <select style={inp} onFocus={onF} onBlur={onB} value={saleForm.saleType} onChange={e => setSaleForm({...saleForm, saleType:e.target.value})}>
-                      <option value="B2C">B2C � Direct to Farmer</option>
-                      <option value="B2B">B2B � To Retailer / Dealer</option>
+                      <option value="B2C">{t('distributor.saleTypeB2C')}</option>
+                      <option value="B2B">{t('distributor.saleTypeB2B')}</option>
                     </select>
                   </div>
-                  <div><label style={LS}>Product Name *</label><input style={inp} onFocus={onF} onBlur={onB} placeholder="Product name" value={saleForm.productName} onChange={e => setSaleForm({...saleForm, productName:e.target.value})} required /></div>
-                  <div><label style={LS}>Pack Size</label><input style={inp} onFocus={onF} onBlur={onB} placeholder="e.g. 1kg" value={saleForm.packSize} onChange={e => setSaleForm({...saleForm, packSize:e.target.value})} /></div>
-                  <div><label style={LS}>Quantity *</label><input style={inp} onFocus={onF} onBlur={onB} type="number" min="0.01" step="0.01" placeholder="Units sold" value={saleForm.quantity} onChange={e => setSaleForm({...saleForm, quantity:e.target.value})} required /></div>
-                  <div><label style={LS}>Price per Unit (Rs.)</label><input style={inp} onFocus={onF} onBlur={onB} type="number" min="0" step="0.01" placeholder="Selling price" value={saleForm.pricePerUnit} onChange={e => setSaleForm({...saleForm, pricePerUnit:e.target.value})} /></div>
+                  <div><label style={LS}>{t('distributor.productName')} *</label><input style={inp} onFocus={onF} onBlur={onB} placeholder={t('distributor.saleProdNamePlaceholder')} value={saleForm.productName} onChange={e => setSaleForm({...saleForm, productName:e.target.value})} required /></div>
+                  <div><label style={LS}>{t('distributor.packSize')}</label><input style={inp} onFocus={onF} onBlur={onB} placeholder={t('distributor.salePackSizePlaceholder')} value={saleForm.packSize} onChange={e => setSaleForm({...saleForm, packSize:e.target.value})} /></div>
+                  <div><label style={LS}>{t('distributor.quantity')} *</label><input style={inp} onFocus={onF} onBlur={onB} type="number" min="0.01" step="0.01" placeholder={t('distributor.saleQtyPlaceholder')} value={saleForm.quantity} onChange={e => setSaleForm({...saleForm, quantity:e.target.value})} required /></div>
+                  <div><label style={LS}>{t('distributor.pricePerUnit')}</label><input style={inp} onFocus={onF} onBlur={onB} type="number" min="0" step="0.01" placeholder={t('distributor.salePricePlaceholder')} value={saleForm.pricePerUnit} onChange={e => setSaleForm({...saleForm, pricePerUnit:e.target.value})} /></div>
                   {saleForm.saleType === 'B2C' ? (
                     <>
-                      <div><label style={LS}>Farmer Name</label><input style={inp} onFocus={onF} onBlur={onB} placeholder="Farmer name" value={saleForm.farmerName} onChange={e => setSaleForm({...saleForm, farmerName:e.target.value})} /></div>
-                      <div><label style={LS}>Farmer Contact</label><input style={inp} onFocus={onF} onBlur={onB} placeholder="Phone number" value={saleForm.farmerContact} onChange={e => setSaleForm({...saleForm, farmerContact:e.target.value})} /></div>
+                      <div><label style={LS}>{t('distributor.farmerName')}</label><input style={inp} onFocus={onF} onBlur={onB} placeholder={t('distributor.saleFarmerNamePlaceholder')} value={saleForm.farmerName} onChange={e => setSaleForm({...saleForm, farmerName:e.target.value})} /></div>
+                      <div><label style={LS}>{t('distributor.farmerContact')}</label><input style={inp} onFocus={onF} onBlur={onB} placeholder={t('distributor.salePhonePlaceholder')} value={saleForm.farmerContact} onChange={e => setSaleForm({...saleForm, farmerContact:e.target.value})} /></div>
                     </>
                   ) : (
                     <>
-                      <div><label style={LS}>Retailer / Dealer Name</label><input style={inp} onFocus={onF} onBlur={onB} placeholder="Business name" value={saleForm.distributorName} onChange={e => setSaleForm({...saleForm, distributorName:e.target.value})} /></div>
-                      <div><label style={LS}>Contact</label><input style={inp} onFocus={onF} onBlur={onB} placeholder="Phone number" value={saleForm.distributorContact} onChange={e => setSaleForm({...saleForm, distributorContact:e.target.value})} /></div>
-                      <div><label style={LS}>Dealer Type</label><input style={inp} onFocus={onF} onBlur={onB} placeholder="retailer / wholesaler" value={saleForm.distributorType} onChange={e => setSaleForm({...saleForm, distributorType:e.target.value})} /></div>
+                      <div><label style={LS}>{t('distributor.retailerName')}</label><input style={inp} onFocus={onF} onBlur={onB} placeholder="Business name" value={saleForm.distributorName} onChange={e => setSaleForm({...saleForm, distributorName:e.target.value})} /></div>
+                      <div><label style={LS}>{t('distributor.contact')}</label><input style={inp} onFocus={onF} onBlur={onB} placeholder={t('distributor.salePhonePlaceholder')} value={saleForm.distributorContact} onChange={e => setSaleForm({...saleForm, distributorContact:e.target.value})} /></div>
+                      <div><label style={LS}>{t('distributor.dealerType')}</label><input style={inp} onFocus={onF} onBlur={onB} placeholder="retailer / wholesaler" value={saleForm.distributorType} onChange={e => setSaleForm({...saleForm, distributorType:e.target.value})} /></div>
                     </>
                   )}
-                  <div><label style={LS}>Payment Mode</label>
+                  <div><label style={LS}>{t('distributor.paymentMode')}</label>
                     <select style={inp} onFocus={onF} onBlur={onB} value={saleForm.paymentMode} onChange={e => setSaleForm({...saleForm, paymentMode:e.target.value})}>
-                      <option value="CASH">Cash</option>
-                      <option value="UPI">UPI</option>
-                      <option value="CREDIT">Credit</option>
-                      <option value="BANK_TRANSFER">Bank Transfer</option>
+                      <option value="CASH">{t('distributor.cash')}</option>
+                      <option value="UPI">{t('distributor.upi')}</option>
+                      <option value="CREDIT">{t('distributor.credit')}</option>
+                      <option value="BANK_TRANSFER">{t('distributor.bankTransfer')}</option>
                     </select>
                   </div>
-                  <div><label style={LS}>Village</label><input style={inp} onFocus={onF} onBlur={onB} placeholder="Village" value={saleForm.village} onChange={e => setSaleForm({...saleForm, village:e.target.value})} /></div>
-                  <div><label style={LS}>District</label><input style={inp} onFocus={onF} onBlur={onB} placeholder="District" value={saleForm.district} onChange={e => setSaleForm({...saleForm, district:e.target.value})} /></div>
-                  <div><label style={LS}>State</label><input style={inp} onFocus={onF} onBlur={onB} placeholder="State" value={saleForm.state} onChange={e => setSaleForm({...saleForm, state:e.target.value})} /></div>
-                  <div style={{ gridColumn:'1 / -1' }}><label style={LS}>Notes</label><input style={inp} onFocus={onF} onBlur={onB} placeholder="Optional notes" value={saleForm.notes} onChange={e => setSaleForm({...saleForm, notes:e.target.value})} /></div>
+                  <div><label style={LS}>{t('distributor.village')}</label><input style={inp} onFocus={onF} onBlur={onB} placeholder={t('distributor.saleVillagePlaceholder')} value={saleForm.village} onChange={e => setSaleForm({...saleForm, village:e.target.value})} /></div>
+                  <div><label style={LS}>{t('distributor.district')}</label><input style={inp} onFocus={onF} onBlur={onB} placeholder={t('distributor.saleDistrictPlaceholder')} value={saleForm.district} onChange={e => setSaleForm({...saleForm, district:e.target.value})} /></div>
+                  <div><label style={LS}>{t('distributor.state')}</label><input style={inp} onFocus={onF} onBlur={onB} placeholder={t('distributor.saleStatePlaceholder')} value={saleForm.state} onChange={e => setSaleForm({...saleForm, state:e.target.value})} /></div>
+                  <div style={{ gridColumn:'1 / -1' }}><label style={LS}>{t('distributor.notes')}</label><input style={inp} onFocus={onF} onBlur={onB} placeholder={t('distributor.saleNotesPlaceholder')} value={saleForm.notes} onChange={e => setSaleForm({...saleForm, notes:e.target.value})} /></div>
                   <div style={{ gridColumn:'1 / -1', display:'flex', gap:10, justifyContent:'flex-end', marginTop:4 }}>
-                    <button type="button" onClick={() => setShowSaleForm(false)} style={BS}>Cancel</button>
-                    <button type="submit" disabled={saleLoading} style={{...BP, background:C.green, opacity: saleLoading ? .7 : 1}}>{saleLoading ? 'Saving...' : 'Preview & Submit'}</button>
+                    <button type="button" onClick={() => setShowSaleForm(false)} style={BS}>{t('distributor.cancel')}</button>
+                    <button type="submit" disabled={saleLoading} style={{...BP, background:C.green, opacity: saleLoading ? .7 : 1}}>{saleLoading ? t('distributor.saving') : t('distributor.previewSubmit')}</button>
                   </div>
                 </form>
               </div>
             )}
-            <SectionCard title="All Sales" onRefresh={loadAll}>
-              {sales.length === 0 && <EmptyRow msg="No sales recorded yet." />}
-              {sales.map(s => <SaleRow key={s._id} sale={s} />)}
-            </SectionCard>
-          </>
-        )}
-
-        {/* SALES TAB */}
-        {activeTab === 'sales' && (
-          <>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
-              <h2 style={{ fontSize:20, fontWeight:900, color:C.navy, margin:0 }}>Sales Records</h2>
-              <button onClick={() => setShowSaleForm(!showSaleForm)} style={{ background:C.green, color:'#fff', border:'none', borderRadius:12, padding:'10px 18px', cursor:'pointer', fontFamily:'Poppins,sans-serif', fontWeight:700, fontSize:13, display:'flex', alignItems:'center', gap:6 }}>
-                <Plus size={16} /> Record Sale
-              </button>
-            </div>
-            {showSaleForm && (
-              <div style={{ background:C.card, borderRadius:18, padding:24, marginBottom:20, boxShadow:'0 8px 32px rgba(62,62,92,.12)', border:'1.5px solid '+C.border }}>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:18 }}>
-                  <h3 style={{ margin:0, color:C.navy, fontWeight:800, fontSize:16 }}>Record Sale Transaction</h3>
-                  <button onClick={() => setShowSaleForm(false)} style={{ background:'none', border:'none', cursor:'pointer', color:C.muted }}><X size={20} /></button>
-                </div>
-                <form onSubmit={openSalePreview} style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))', gap:12 }}>
-                  <div><label style={LS}>Sale Type *</label>
-                    <select style={inp} onFocus={onF} onBlur={onB} value={saleForm.saleType} onChange={e => setSaleForm({...saleForm, saleType:e.target.value})}>
-                      <option value="B2C">B2C � Direct to Farmer</option>
-                      <option value="B2B">B2B � To Retailer / Dealer</option>
-                    </select>
-                  </div>
-                  <div><label style={LS}>Product Name *</label><input style={inp} onFocus={onF} onBlur={onB} placeholder="Product name" value={saleForm.productName} onChange={e => setSaleForm({...saleForm, productName:e.target.value})} required /></div>
-                  <div><label style={LS}>Pack Size</label><input style={inp} onFocus={onF} onBlur={onB} placeholder="e.g. 1kg" value={saleForm.packSize} onChange={e => setSaleForm({...saleForm, packSize:e.target.value})} /></div>
-                  <div><label style={LS}>Quantity *</label><input style={inp} onFocus={onF} onBlur={onB} type="number" min="0.01" step="0.01" placeholder="Units sold" value={saleForm.quantity} onChange={e => setSaleForm({...saleForm, quantity:e.target.value})} required /></div>
-                  <div><label style={LS}>Price per Unit (Rs.)</label><input style={inp} onFocus={onF} onBlur={onB} type="number" min="0" step="0.01" placeholder="Selling price" value={saleForm.pricePerUnit} onChange={e => setSaleForm({...saleForm, pricePerUnit:e.target.value})} /></div>
-                  {saleForm.saleType === 'B2C' ? (
-                    <>
-                      <div><label style={LS}>Farmer Name</label><input style={inp} onFocus={onF} onBlur={onB} placeholder="Farmer name" value={saleForm.farmerName} onChange={e => setSaleForm({...saleForm, farmerName:e.target.value})} /></div>
-                      <div><label style={LS}>Farmer Contact</label><input style={inp} onFocus={onF} onBlur={onB} placeholder="Phone number" value={saleForm.farmerContact} onChange={e => setSaleForm({...saleForm, farmerContact:e.target.value})} /></div>
-                    </>
-                  ) : (
-                    <>
-                      <div><label style={LS}>Retailer / Dealer Name</label><input style={inp} onFocus={onF} onBlur={onB} placeholder="Business name" value={saleForm.distributorName} onChange={e => setSaleForm({...saleForm, distributorName:e.target.value})} /></div>
-                      <div><label style={LS}>Contact</label><input style={inp} onFocus={onF} onBlur={onB} placeholder="Phone number" value={saleForm.distributorContact} onChange={e => setSaleForm({...saleForm, distributorContact:e.target.value})} /></div>
-                      <div><label style={LS}>Dealer Type</label><input style={inp} onFocus={onF} onBlur={onB} placeholder="retailer / wholesaler" value={saleForm.distributorType} onChange={e => setSaleForm({...saleForm, distributorType:e.target.value})} /></div>
-                    </>
-                  )}
-                  <div><label style={LS}>Payment Mode</label>
-                    <select style={inp} onFocus={onF} onBlur={onB} value={saleForm.paymentMode} onChange={e => setSaleForm({...saleForm, paymentMode:e.target.value})}>
-                      <option value="CASH">Cash</option>
-                      <option value="UPI">UPI</option>
-                      <option value="CREDIT">Credit</option>
-                      <option value="BANK_TRANSFER">Bank Transfer</option>
-                    </select>
-                  </div>
-                  <div><label style={LS}>Village</label><input style={inp} onFocus={onF} onBlur={onB} placeholder="Village" value={saleForm.village} onChange={e => setSaleForm({...saleForm, village:e.target.value})} /></div>
-                  <div><label style={LS}>District</label><input style={inp} onFocus={onF} onBlur={onB} placeholder="District" value={saleForm.district} onChange={e => setSaleForm({...saleForm, district:e.target.value})} /></div>
-                  <div><label style={LS}>State</label><input style={inp} onFocus={onF} onBlur={onB} placeholder="State" value={saleForm.state} onChange={e => setSaleForm({...saleForm, state:e.target.value})} /></div>
-                  <div style={{ gridColumn:'1 / -1' }}><label style={LS}>Notes</label><input style={inp} onFocus={onF} onBlur={onB} placeholder="Optional notes" value={saleForm.notes} onChange={e => setSaleForm({...saleForm, notes:e.target.value})} /></div>
-                  <div style={{ gridColumn:'1 / -1', display:'flex', gap:10, justifyContent:'flex-end', marginTop:4 }}>
-                    <button type="button" onClick={() => setShowSaleForm(false)} style={BS}>Cancel</button>
-                    <button type="submit" disabled={saleLoading} style={{...BP, background:C.green, opacity: saleLoading ? .7 : 1}}>{saleLoading ? 'Saving...' : 'Preview & Submit'}</button>
-                  </div>
-                </form>
-              </div>
-            )}
-            <SectionCard title="All Sales (newest first)" onRefresh={loadAll}>
+            <SectionCard title={t('distributor.allSalesNewest')} onRefresh={loadAll}>
               {sales.length === 0 && <EmptyRow msg="No sales recorded yet." />}
               {sales.map(s => <SaleRow key={s._id} sale={s} />)}
             </SectionCard>
