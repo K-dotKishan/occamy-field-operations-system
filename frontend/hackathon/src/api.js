@@ -7,7 +7,8 @@ export async function api(endpoint, method = "GET", body = null) {
     method,
     headers: {
       "Content-Type": "application/json",
-      ...(token && { Authorization: `Bearer ${token}` })
+      ...(token && { Authorization: `Bearer ${token}` }),
+      "Accept-Language": localStorage.getItem("i18nextLng") || "en"
     },
     ...(body && { body: JSON.stringify(body) })
   }
