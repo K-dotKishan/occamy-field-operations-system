@@ -1,16 +1,17 @@
 🚀 Occamy Bioscience
 Field Operations Tracking & Distribution Management System
-
 📱 Mobile-First | Rural-Ready | Scalable
 
-Occamy is a mobile-first internal operations platform designed to replace unstructured WhatsApp-based tracking for rural field operations and distributor operations.
+Occamy is a mobile-first internal operations platform designed to replace unstructured WhatsApp-based tracking for rural field operations and distributor management.
 
 Built specifically for smartphone usage in rural environments, Occamy ensures:
 
 Smooth performance in low connectivity areas
-Simple workflows for low digital literacy users
+Simple workflows for users with low digital literacy
 Structured, verifiable activity tracking
 Inventory & sales visibility for distributors
+Product purchase & sales management
+Bilingual interface (Hindi & English)
 Scalable deployment across regions
 🌐 Live Application
 🔗 Frontend (Vercel)
@@ -30,32 +31,53 @@ https://drive.google.com/file/d/1GfxLntCp2LYFY74p7Wnnl6MAc800VU8X/view?usp=shari
 Occamy digitizes rural field operations by transforming:
 
 ❌ WhatsApp logs
+
 ❌ Phone call updates
+
 ❌ Manual registers
+
 ❌ Unstructured distributor stock updates
 
 Into:
 
 ✅ Structured activity tracking
+
 ✅ Location-verified entries
+
 ✅ Photo-supported records
+
 ✅ Real-time admin monitoring
+
 ✅ Distributor inventory visibility
-✅ Sales & stock analytics
+
+✅ Sales & purchase management
+
+✅ Product movement tracking
+
 ✅ Actionable analytics
 
-It helps track:
+The platform helps manage:
 
 Field officer attendance
 Meetings & visits
 Travel & distance
 Sample distribution
 Sales & order capture
-Distributor stock inventory
-Product sales reporting
-Daily distributor activity
+Distributor inventory
+Product purchase records
+Product sales records
+Daily field activities
+Inventory movement
 
-All inside a secure and mobile-optimized system.
+All inside a secure, scalable, and mobile-optimized platform.
+
+🌍 Multi-Language Support
+
+Occamy supports Hindi and English throughout the application.
+
+Users can switch between languages for a more comfortable experience, making the platform easier to use in rural areas where English proficiency may be limited.
+
+The bilingual interface improves accessibility and adoption among field officers and distributors.
 
 🛠 Tech Stack
 Layer	Technology
@@ -66,144 +88,180 @@ Authentication	JWT
 Deployment	Vercel + Render
 👥 User Roles
 👨‍💼 Admin
-Dashboard & analytics access
+Dashboard & analytics
 User & role management
-Activity monitoring across regions
-Sales & performance tracking
+Region monitoring
+Attendance tracking
+Sales analytics
+Purchase analytics
 Distance travelled insights
-Monthly summaries
-Distributor stock visibility
+Monthly reports
+Distributor inventory monitoring
 Product movement tracking
-Inventory monitoring
-Region-wise distributor performance
-Distributor sales analytics
+Low stock alerts
+Inventory analytics
+Distributor performance reports
 🚜 Distributor / Field Officer
-Secure login
-Start / End Day attendance
-Location tracking
-Meeting & visit logging
-Photo & notes upload
-Sample distribution entry
-B2B & B2C sales capture
-Product stock management
-Inventory updates
-Daily sales entry
-Product quantity sold reporting
-Available stock visibility
-Order reporting
-Sales performance tracking
+Secure Login
+Hindi & English Interface
+Start / End Day Attendance
+GPS Location Tracking
+Meeting & Visit Logging
+Photo Upload
+Notes & Remarks
+Sample Distribution
+B2B Sales
+B2C Sales
+Product Purchase Entry
+Product Selling Entry
+Inventory Management
+Stock Updates
+Product Quantity Tracking
+Available Stock Monitoring
+Daily Sales Reports
+Purchase History
+Sales History
+Order Management
 
-Distributors can maintain:
+Distributors can:
 
-How much stock they currently have
-How much quantity has been sold
-Product-wise inventory updates
-Daily/weekly sales activity
-Sales history and order records
+Purchase products from the company
+Sell products to retailers or customers
+Update available inventory
+Record incoming stock
+Record outgoing stock
+View current stock levels
+Track sold quantities
+Maintain purchase history
+Maintain sales history
 ✅ Core Features
 📍 Meeting & Interaction Logging
 One-to-one meetings
 Farmer group meetings
-Auto location capture
-Photo upload
+Auto GPS capture
 Timestamped records
-📦 Sample Distribution Tracking
+Photo uploads
+📦 Sample Distribution
 Quantity tracking
 Receiver details
 Purpose logging
-Historical data tracking
-💰 Sales & Order Capture
-B2C sales
-B2B sales
-SKU & pack size tracking
-Repeat order tracking
-Product-wise sales reporting
+Historical records
+💰 Sales Management
+B2B Sales
+B2C Sales
+Product selection
+SKU & Pack Size
+Quantity Sold
+Sales History
+Repeat Orders
+Sales Analytics
+🛒 Product Purchase Management
+
+Distributors can:
+
+Purchase products from the company
+Add newly received stock
+Record purchase quantity
+View purchase history
+Maintain purchase records
 📦 Distributor Inventory Management
 
-New distributor management module includes:
+The distributor module includes:
 
-Real-time stock management
+Real-time inventory management
 Product quantity tracking
-Available inventory visibility
-Sold quantity tracking
+Current stock visibility
+Purchase tracking
+Sales tracking
 Product movement logs
-Restock updates
+Restock management
 Inventory history
 
 Distributors can update:
 
-Current stock available
-Quantity sold
-Product dispatch details
-Order fulfilment status
+Available stock
+Purchased quantity
+Sold quantity
+Product dispatch
+Order fulfilment
+Inventory adjustments
 
 Admins can monitor:
 
-Distributor inventory levels
+Distributor inventory
 Product movement
-Sales performance
-Region-wise stock availability
-Inventory consumption trends
+Inventory trends
+Region-wise stock
+Distributor sales
+Purchase reports
+Stock consumption
 📊 Admin Dashboard
-Distance travelled tracking
+
+The dashboard provides:
+
+Attendance analytics
+Distance travelled
 Meeting analytics
-Sales analytics (B2B vs B2C)
-Distributor performance analytics
+Sales analytics
+Purchase analytics
+Inventory insights
+Product movement
+Distributor performance
 Region-wise activity
 Monthly summaries
-Inventory insights
-Product stock monitoring
-Distributor sales comparison
+Stock monitoring
+Sales comparison
 🔐 Security
-Role Based Access Control (RBAC)
-Protected API routes
 JWT Authentication
-Secure session handling
+Role-Based Access Control (RBAC)
+Protected API Routes
+Secure Session Handling
 📱 Key Design Goals
-Mobile-first UI (Optimized for smartphones)
+Mobile-first design
+Optimized for smartphones
 Rural connectivity friendly
-Minimal and simple workflows
+Hindi & English support
+Simple user experience
 Verifiable activity tracking
 Distributor stock transparency
+Purchase & sales tracking
 Scalable backend architecture
 🚀 Deployment
-
-Frontend deployed using Vercel
-Backend deployed using Render
-Database hosted on MongoDB Cloud
+Frontend deployed on Vercel
+Backend deployed on Render
+Database hosted on MongoDB Atlas
 
 Production-ready and live.
 
 📂 Submission Includes
-
 ✅ Working Prototype
-✅ GitHub Repository (Frontend + Backend)
+✅ GitHub Repository
 ✅ Demo Video
 ✅ Architecture Explanation
+🛠 Run Locally
+Prerequisites
 
-🛠 How to Run the Project Locally
-📌 Prerequisites
+Install:
 
-Make sure you have installed:
+Node.js (v18+)
+npm
+MongoDB (Local or Atlas)
+Clone Repository
+git clone <repository-link>
 
-Node.js (v18 or above recommended)
-https://nodejs.org
-npm (comes with Node.js)
-MongoDB (Local or MongoDB Atlas)
-📦 Clone the Repository
-git clone <your-repository-link>
 cd occamy
-🔵 Backend Setup (Node.js + Express)
+Backend
 cd backend
+
 npm install
 
-Create a .env file inside the backend folder:
+Create .env
 
 PORT=5000
 MONGO_URI=your_mongodb_connection_string
 JWT_SECRET=your_secret_key
 
-Run backend:
+Run
 
 npm run dev
 
@@ -211,21 +269,25 @@ or
 
 node server.js
 
-Backend runs on:
+Backend:
 
 http://localhost:5000
-🟢 Frontend Setup (React)
+Frontend
 cd frontend
+
 npm install
+
 npm run dev
 
-Frontend runs on:
+Frontend:
 
 http://localhost:5173
 🎯 Vision
 
-To build a reliable, auditable, and scalable digital infrastructure that digitizes rural supply chain field operations and distributor operations — replacing informal communication tools with structured intelligence.
+To build a reliable, auditable, and scalable digital infrastructure that digitizes rural field operations and distributor management by replacing informal communication with structured intelligence.
 
-Occamy is not just a tracking platform.
+Occamy enables organizations to manage field activities, inventory, product purchases, sales, distributor performance, and supply chain visibility from a single platform.
 
-It is a step toward transforming rural operations, distribution management, and supply chain visibility through technology.
+With Hindi & English language support, real-time inventory management, and purchase & sales tracking, Occamy is designed to improve usability, transparency, and operational efficiency for both field officers and distributors.
+
+Occamy is not just a tracking platform—it is a complete digital solution for rural operations, distributor management, inventory control, and supply chain visibility.
