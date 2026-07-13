@@ -13,7 +13,9 @@ Inventory & sales visibility for distributors
 Product purchase & sales management
 Bilingual interface (Hindi & English)
 Scalable deployment across regions
+
 🌐 Live Application
+
 🔗 Frontend (Vercel)
 
 https://occamy-frontend.vercel.app
