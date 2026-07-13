@@ -1,5 +1,6 @@
 ﻿import { socket } from "../socket"
 import occamyLogo from "../assets/occamylogo.jpg"
+import LanguageToggle from "../components/LanguageToggle"
 import { MapContainer, TileLayer, Marker, Polyline, Popup, Circle } from "react-leaflet"
 import "leaflet/dist/leaflet.css"
 import L from "leaflet"
@@ -32,6 +33,7 @@ L.Icon.Default.mergeOptions({
 
 import { useEffect, useState, useRef } from "react"
 import { useNavigate } from "react-router-dom"
+import { useTranslation } from "react-i18next"
 import { api } from "../api"
 import {
   MapPin, ShoppingCart, Package, Users, TrendingUp, Calendar, LogOut,
@@ -59,6 +61,7 @@ import {
 
 export default function Dashboard() {
   const navigate = useNavigate()
+  const { t, i18n } = useTranslation()
   const role = localStorage.getItem("role")
   const userId = localStorage.getItem("userId")
   const userName = localStorage.getItem("name") || "User"
@@ -804,7 +807,7 @@ export default function Dashboard() {
                       : 'bg-gradient-to-r from-gray-500 to-gray-600'
                       }`}>
                       <div className={`w-2 h-2 rounded-full ${isTracking ? 'bg-white animate-ping' : 'bg-gray-300'}`}></div>
-                      <span>{isTracking ? 'LIVE TRACKING' : 'OFFLINE'}</span>
+                      <span>{isTracking ? t('field.liveTracking') : t('field.trackingOffline')}</span>
                     </div>
                   )}
 
@@ -846,6 +849,8 @@ export default function Dashboard() {
               >
                 <LogOut size={20} />
               </button>
+              {/* Language toggle — visible on all screen sizes */}
+              <LanguageToggle />
             </div>
           </div>
 
@@ -892,7 +897,7 @@ export default function Dashboard() {
                         className="flex items-center gap-3 p-3 rounded-xl hover:bg-white hover:bg-opacity-10 text-white transition-all"
                       >
                         <MapPin size={20} />
-                        <span className="font-medium">Start Day</span>
+                        <span className="font-medium">{t('field.startDay')}</span>
                       </button>
                     ) : (
                       <button
@@ -903,7 +908,7 @@ export default function Dashboard() {
                         className="flex items-center gap-3 p-3 rounded-xl hover:bg-white hover:bg-opacity-10 text-red-300 transition-all bg-red-500/10"
                       >
                         <LogOut size={20} />
-                        <span className="font-medium">End Day</span>
+                        <span className="font-medium">{t('field.endDay')}</span>
                       </button>
                     )}
 
@@ -915,7 +920,7 @@ export default function Dashboard() {
                       className="flex items-center gap-3 p-3 rounded-xl hover:bg-white hover:bg-opacity-10 text-white transition-all"
                     >
                       <Users size={20} />
-                      <span className="font-medium">Log 1:1 Meeting</span>
+                      <span className="font-medium">{t('meeting.oneToOne')}</span>
                     </button>
                     <button
                       onClick={() => {
@@ -925,7 +930,7 @@ export default function Dashboard() {
                       className="flex items-center gap-3 p-3 rounded-xl hover:bg-white hover:bg-opacity-10 text-white transition-all"
                     >
                       <Users size={20} className="rotate-12" />
-                      <span className="font-medium">Log Group Meeting</span>
+                      <span className="font-medium">{t('meeting.group')}</span>
                     </button>
                     <button
                       onClick={() => {
@@ -935,7 +940,7 @@ export default function Dashboard() {
                       className="flex items-center gap-3 p-3 rounded-xl hover:bg-white hover:bg-opacity-10 text-white transition-all"
                     >
                       <TrendingUp size={20} />
-                      <span className="font-medium">Record Sale</span>
+                      <span className="font-medium">{t('field.recordSale')}</span>
                     </button>
                     <button
                       onClick={() => {
@@ -945,7 +950,7 @@ export default function Dashboard() {
                       className="flex items-center gap-3 p-3 rounded-xl hover:bg-white hover:bg-opacity-10 text-white transition-all"
                     >
                       <Navigation size={20} />
-                      <span className="font-medium">{isTracking ? 'Stop Tracking' : 'Start Tracking'}</span>
+                      <span className="font-medium">{isTracking ? t('field.trackingOffline') : t('field.liveTracking')}</span>
                     </button>
                   </>
                 )}
@@ -1046,7 +1051,7 @@ export default function Dashboard() {
                 className="flex flex-col items-center gap-1 p-2 rounded-xl text-emerald-600"
               >
                 <Home size={24} strokeWidth={2.5} />
-                <span className="text-[10px] font-bold">Home</span>
+                <span className="text-[10px] font-bold">{t('nav.dashboard')}</span>
               </button>
 
               <button
@@ -1054,7 +1059,7 @@ export default function Dashboard() {
                 className="flex flex-col items-center gap-1 p-2 rounded-xl text-gray-500 hover:text-indigo-600 transition-all"
               >
                 <Users size={24} />
-                <span className="text-[10px] font-bold">Meeting</span>
+                <span className="text-[10px] font-bold">{t('field.logMeeting')}</span>
               </button>
 
               {/* Removed Dollar Icon Button */}
@@ -1065,14 +1070,13 @@ export default function Dashboard() {
                   if (locationSection) {
                     locationSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
                   } else {
-                    // Fallback if not rendered yet
                     window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
                   }
                 }}
                 className="flex flex-col items-center gap-1 p-2 rounded-xl text-gray-500 hover:text-emerald-600 transition-all"
               >
                 <MapPin size={24} />
-                <span className="text-[10px] font-bold">Path</span>
+                <span className="text-[10px] font-bold">{t('field.distance')}</span>
               </button>
 
               <button
@@ -1650,8 +1654,10 @@ export default function Dashboard() {
         {/* ================= FIELD OFFICER DASHBOARD ================= */}
         {role === "FIELD" && (
           <>
+            {/* Reactive language dependency to force re-render on language change */}
+            {/* lang: {i18n.language} */}
             <h2 className="text-2xl sm:text-4xl font-black mb-6 text-gray-800 animate-fadeIn">
-              Field Officer Dashboard
+              {t('field.fieldOfficer')}
             </h2>
 
             {/* Live Tracking Status */}
@@ -1668,12 +1674,12 @@ export default function Dashboard() {
                     </div>
                     <div>
                       <p className="font-bold text-lg sm:text-xl">
-                        {isTracking ? 'Live Tracking Active' : 'Tracking Offline'}
+                        {isTracking ? t('field.liveTracking') : t('field.trackingOffline')}
                       </p>
                       <p className="text-sm opacity-90 mt-1">
                         {isTracking
-                          ? 'Your location is being shared with admin in real-time'
-                          : 'Start tracking to share your location with admin'}
+                          ? t('field.fieldOfficerSub')
+                          : t('field.startDaySub')}
                       </p>
                     </div>
                   </div>
@@ -1689,7 +1695,7 @@ export default function Dashboard() {
                         : 'bg-white text-gray-800 hover:bg-gray-100'
                         }`}
                     >
-                      {isTracking ? 'Stop Tracking' : 'Start Tracking'}
+                      {isTracking ? t('field.endDay') : t('field.startDay')}
                     </button>
                   </div>
                 </div>
@@ -1699,14 +1705,14 @@ export default function Dashboard() {
             {/* Field Stats Grid - Only Sales and Distance */}
             <div className="grid grid-cols-2 gap-3 sm:gap-6 mb-6">
               <StatCard
-                label="SALES"
+                label={t('field.salesLabel')}
                 value={fieldStats?.sales || 0}
                 icon={<TrendingUp size={20} />}
                 color="from-[#3b758c] to-[#1797a6]"
                 delay={200}
               />
               <StatCard
-                label="DISTANCE"
+                label={t('field.distance')}
                 value={`${(!activeAttendance ? 0 : (fieldStats?.distanceTraveled || 0)).toFixed(2)} km`}
                 icon={<Navigation size={20} />}
                 color="from-[#3b758c] to-[#1797a6]"
@@ -1714,13 +1720,13 @@ export default function Dashboard() {
               />
             </div>
 
-            {/* Action Grid - Only Start/End Day and Record Sale */}
+            {/* Action Grid */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-6 mb-6">
               {!activeAttendance ? (
                 <ActionButton
                   icon={<MapPin size={20} />}
-                  label="Start Day"
-                  subtitle="Mark attendance"
+                  label={t('field.startDay')}
+                  subtitle={t('field.startDaySub')}
                   color="from-[#3b758c] to-[#1797a6]"
                   onClick={startDay}
                   delay={0}
@@ -1728,35 +1734,34 @@ export default function Dashboard() {
               ) : (
                 <ActionButton
                   icon={<MapPin size={20} />}
-                  label="End Day"
-                  subtitle="Clock out for the day"
+                  label={t('field.endDay')}
+                  subtitle={t('field.endDaySub')}
                   color="from-[#3b758c] to-[#1797a6]"
                   onClick={endDay}
                   disabled={isEndingDay}
                   delay={0}
                 />
               )}
-              {/* Removed Meetings and Samples */}
               <ActionButton
                 icon={<Users size={20} />}
-                label="One-to-One"
-                subtitle="Individual meeting"
+                label={t('meeting.oneToOne')}
+                subtitle={t('field.logMeetingSub')}
                 color="from-[#3b758c] to-[#1797a6]"
                 onClick={() => openMeetingForm("ONE_TO_ONE")}
                 delay={150}
               />
               <ActionButton
                 icon={<Users size={20} className="rotate-12" />}
-                label="Group"
-                subtitle="Group session"
+                label={t('meeting.group')}
+                subtitle={t('field.logMeetingSub')}
                 color="from-[#3b758c] to-[#1797a6]"
                 onClick={() => openMeetingForm("GROUP")}
                 delay={300}
               />
               <ActionButton
                 icon={<TrendingUp size={20} />}
-                label="Record Sale"
-                subtitle="New transaction"
+                label={t('field.recordSale')}
+                subtitle={t('field.recordSaleSub')}
                 color="from-[#3b758c] to-[#1797a6]"
                 onClick={() => setShowSaleForm(true)}
                 delay={450}
@@ -1770,14 +1775,14 @@ export default function Dashboard() {
                   <div>
                     <p className="font-bold text-blue-900 flex items-center gap-2 text-lg">
                       <MapPin size={24} className="text-blue-600" />
-                      Current Location
+                      {t('common.village')}
                     </p>
                     <p className="text-sm text-blue-700">
-                      {isTracking ? 'Live location tracking active' : 'Last recorded location'}
+                      {isTracking ? t('field.liveTracking') : t('field.trackingOffline')}
                     </p>
                   </div>
                   <span className="text-xs px-3 py-1.5 bg-blue-100 text-blue-700 rounded-full font-bold shadow-sm">
-                    {isTracking ? 'LIVE TRACKING' : 'STATIC'}
+                    {isTracking ? 'LIVE' : 'STATIC'}
                   </span>
                 </div>
 
@@ -2894,6 +2899,7 @@ function ChevronRight({ className, size = 16 }) {
 
 /* ================= ENHANCED FIELD MEETING ONE ================= */
 function EnhancedFieldMeetingOne({ onClose }) {
+  const { t } = useTranslation()
   const [notes, setNotes] = useState("")
   const [category, setCategory] = useState("FARMER")
   const [personName, setPersonName] = useState("")
@@ -2936,7 +2942,7 @@ function EnhancedFieldMeetingOne({ onClose }) {
 
   const submit = async () => {
     if (!personName.trim()) {
-      showNotification("error", "Please enter name")
+      showNotification("error", t('field.meetingFailed') + "Please enter name")
       return
     }
 
@@ -2979,7 +2985,7 @@ function EnhancedFieldMeetingOne({ onClose }) {
 
       await api("/field/meeting", "POST", meetingData)
 
-      showNotification("success", "Meeting logged successfully!")
+      showNotification("success", t('field.meetingLogged'))
       setNotes("")
       setPersonName("")
       setPhone("")
@@ -2989,7 +2995,7 @@ function EnhancedFieldMeetingOne({ onClose }) {
     } catch (error) {
       console.error("Error logging meeting:", error)
       const errorMsg = error?.error || error?.message || "Unknown error"
-      showNotification("error", "Failed to log meeting: " + errorMsg)
+      showNotification("error", t('field.meetingFailed') + errorMsg)
       setLoading(false)
     }
   }
@@ -2998,8 +3004,8 @@ function EnhancedFieldMeetingOne({ onClose }) {
     <div id="meeting-form-one" className="bg-white p-6 sm:p-8 rounded-2xl sm:rounded-3xl shadow-lg sm:shadow-xl mb-6 sm:mb-8 border-2 border-indigo-200 animate-slideInUp">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h2 className="text-xl sm:text-2xl font-black text-gray-800">One-to-One Meeting</h2>
-          <p className="text-sm text-gray-600 mt-1">Log individual meetings</p>
+          <h2 className="text-xl sm:text-2xl font-black text-gray-800">{t('meeting.oneToOne')}</h2>
+          <p className="text-sm text-gray-600 mt-1">{t('field.logMeetingSub')}</p>
         </div>
         <button
           onClick={onClose}
@@ -3011,7 +3017,7 @@ function EnhancedFieldMeetingOne({ onClose }) {
 
       <div className="space-y-4 sm:space-y-5">
         <div>
-          <label className="block text-sm font-bold text-gray-700 mb-2">Category</label>
+          <label className="block text-sm font-bold text-gray-700 mb-2">{t('meeting.category')}</label>
           <select
             value={category}
             onChange={e => setCategory(e.target.value)}
@@ -3032,30 +3038,26 @@ function EnhancedFieldMeetingOne({ onClose }) {
 
         <div>
           <label className="block text-sm font-bold text-gray-700 mb-2">
-            {category === 'FARMER' ? 'Farmer Name' :
-              category === 'SELLER' ? 'Seller Name' :
-                category === 'INFLUENCER' ? 'Influencer Name' :
-                  category === 'DISTRIBUTOR' ? 'Distributor Name' :
-                    'Name'} <span className="text-red-500">*</span>
+            {t('meeting.personName')} <span className="text-red-500">*</span>
           </label>
           <input
             type="text"
             value={personName}
             onChange={e => setPersonName(e.target.value)}
-            placeholder="Enter full name"
+            placeholder={t('meeting.personName')}
             className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-bold text-gray-700 mb-2">Phone Number</label>
+          <label className="block text-sm font-bold text-gray-700 mb-2">{t('meeting.contactNumber')}</label>
           <div className="relative">
             <Phone className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
             <input
               type="tel"
               value={phone}
               onChange={e => setPhone(e.target.value)}
-              placeholder="Enter phone number (optional)"
+              placeholder={t('meeting.contactNumber')}
               className="w-full pl-12 pr-4 py-3 border-2 border-gray-300 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all"
             />
           </div>
@@ -3194,25 +3196,25 @@ function EnhancedFieldMeetingOne({ onClose }) {
 
         <div>
           <label className="block text-sm font-bold text-gray-700 mb-2">
-            Meeting Photos {meetingPhotos.length > 0 && <span className="text-indigo-600 font-normal">— {meetingPhotos.length} selected</span>}
+            {t('meeting.photos')} {meetingPhotos.length > 0 && <span className="text-indigo-600 font-normal">— {meetingPhotos.length} selected</span>}
           </label>
           <div className="border-2 border-dashed border-gray-300 rounded-xl p-3 transition-all hover:border-indigo-500">
             {meetingPhotos.length === 0 && (
               <div className="flex flex-col items-center gap-1 py-2">
                 <Camera size={28} className="text-gray-400" />
-                <p className="text-xs text-gray-500">Multiple photos allowed · JPG, PNG, WEBP</p>
+                <p className="text-xs text-gray-500">{t('common.multiplePhotos')}</p>
               </div>
             )}
             <div className="flex gap-2 justify-center mt-2">
               <label className="cursor-pointer flex-1">
                 <div className="flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg font-bold text-sm hover:from-indigo-600 hover:to-purple-700 transition-all text-center">
-                  <Upload size={14} />Gallery
+                  <Upload size={14} />{t('common.gallery')}
                 </div>
                 <input type="file" accept="image/*" multiple onChange={handlePhotoChange} className="hidden" />
               </label>
               <label className="cursor-pointer flex-1">
                 <div className="flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-lg font-bold text-sm hover:from-emerald-600 hover:to-teal-700 transition-all text-center">
-                  <Camera size={14} />Take Photo
+                  <Camera size={14} />{t('common.takePhoto')}
                 </div>
                 <input type="file" accept="image/*" capture="environment" onChange={handlePhotoChange} className="hidden" />
               </label>
@@ -3234,10 +3236,10 @@ function EnhancedFieldMeetingOne({ onClose }) {
         </div>
 
         <div>
-          <label className="block text-sm font-bold text-gray-700 mb-2">Meeting Notes</label>
+          <label className="block text-sm font-bold text-gray-700 mb-2">{t('meeting.notes')}</label>
           <textarea
             className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all"
-            placeholder="Enter meeting details, discussion points, outcomes, feedback..."
+            placeholder={t('meeting.notes')}
             rows="5"
             value={notes}
             onChange={e => setNotes(e.target.value)}
@@ -3250,14 +3252,14 @@ function EnhancedFieldMeetingOne({ onClose }) {
           onClick={onClose}
           className="flex-1 py-3 bg-gradient-to-br from-gray-100 to-gray-200 hover:from-gray-200 hover:to-gray-300 text-gray-800 rounded-xl font-bold transition-all shadow-sm hover:shadow"
         >
-          Cancel
+          {t('common.cancel')}
         </button>
         <button
           onClick={submit}
           disabled={loading || !personName.trim()}
           className="flex-1 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl font-bold transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {loading ? "Saving..." : "Save Meeting"}
+          {loading ? t('common.saving') : t('field.saveMeeting')}
         </button>
       </div>
     </div>
@@ -3266,6 +3268,7 @@ function EnhancedFieldMeetingOne({ onClose }) {
 
 /* ================= ENHANCED FIELD MEETING GROUP ================= */
 function EnhancedFieldMeetingGroup({ onClose }) {
+  const { t } = useTranslation()
   const [village, setVillage] = useState("")
   const [count, setCount] = useState(0)
   const [category, setCategory] = useState("FARMER")
@@ -3308,11 +3311,11 @@ function EnhancedFieldMeetingGroup({ onClose }) {
 
   const submit = async () => {
     if (!village.trim()) {
-      showNotification("error", "Please enter village name")
+      showNotification("error", t('meeting.village') + " required")
       return
     }
     if (count === 0) {
-      showNotification("error", "Please enter number of attendees")
+      showNotification("error", t('meeting.numAttendees') + " required")
       return
     }
 
@@ -3344,7 +3347,7 @@ function EnhancedFieldMeetingGroup({ onClose }) {
 
       await api("/field/meeting", "POST", meetingData)
 
-      showNotification("success", "Group meeting logged successfully!")
+      showNotification("success", t('field.meetingLogged'))
       setVillage(""); setCount(0); setTopic(""); setEntityName("")
       setProductSampleAvailable(false); setProductSampleGiven(false)
       setGroupPhotos([])
@@ -3353,7 +3356,7 @@ function EnhancedFieldMeetingGroup({ onClose }) {
     } catch (error) {
       console.error("Error logging group meeting:", error)
       const errorMsg = error?.error || error?.message || "Unknown error"
-      showNotification("error", "Failed to log meeting: " + errorMsg)
+      showNotification("error", t('field.meetingFailed') + errorMsg)
       setLoading(false)
     }
   }
@@ -3362,8 +3365,8 @@ function EnhancedFieldMeetingGroup({ onClose }) {
     <div id="meeting-form-group" className="bg-white p-6 sm:p-8 rounded-2xl sm:rounded-3xl shadow-lg sm:shadow-xl mb-6 sm:mb-8 border-2 border-purple-200 animate-slideInUp">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h2 className="text-xl sm:text-2xl font-black text-gray-800">Group Meeting</h2>
-          <p className="text-sm text-gray-600 mt-1">Log group sessions with multiple participants</p>
+          <h2 className="text-xl sm:text-2xl font-black text-gray-800">{t('meeting.group')}</h2>
+          <p className="text-sm text-gray-600 mt-1">{t('field.logMeetingSub')}</p>
         </div>
         <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors p-2 hover:bg-gray-100 rounded-full">
           <X size={24} />
@@ -3374,7 +3377,7 @@ function EnhancedFieldMeetingGroup({ onClose }) {
 
         {/* Category */}
         <div>
-          <label className="block text-sm font-bold text-gray-700 mb-2">Category</label>
+          <label className="block text-sm font-bold text-gray-700 mb-2">{t('meeting.category')}</label>
           <select
             value={category}
             onChange={e => { setCategory(e.target.value); setEntityName("") }}
@@ -3392,28 +3395,13 @@ function EnhancedFieldMeetingGroup({ onClose }) {
           </select>
         </div>
 
-        {/* Entity Name — shown for institutional categories */}
-        {ENTITY_CATEGORIES.includes(category) && (
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2">
-              Entity Name <span className="text-red-500">*</span>
-            </label>
-            <input
-              placeholder={entityPlaceholder}
-              className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200 outline-none transition-all"
-              value={entityName}
-              onChange={e => setEntityName(e.target.value)}
-            />
-          </div>
-        )}
-
         {/* Village */}
         <div>
           <label className="block text-sm font-bold text-gray-700 mb-2">
-            Village Name <span className="text-red-500">*</span>
+            {t('meeting.village')} <span className="text-red-500">*</span>
           </label>
           <input
-            placeholder="Enter village name"
+            placeholder={t('meeting.village')}
             className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200 outline-none transition-all"
             value={village}
             onChange={e => setVillage(e.target.value)}
@@ -3422,9 +3410,9 @@ function EnhancedFieldMeetingGroup({ onClose }) {
 
         {/* Topic */}
         <div>
-          <label className="block text-sm font-bold text-gray-700 mb-2">Meeting Topic</label>
+          <label className="block text-sm font-bold text-gray-700 mb-2">{t('meeting.meetingType')}</label>
           <input
-            placeholder="e.g., New Pesticide Training, Crop Rotation Seminar"
+            placeholder={t('meeting.meetingType')}
             className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200 outline-none transition-all"
             value={topic}
             onChange={e => setTopic(e.target.value)}
@@ -3434,11 +3422,11 @@ function EnhancedFieldMeetingGroup({ onClose }) {
         {/* Attendees */}
         <div>
           <label className="block text-sm font-bold text-gray-700 mb-2">
-            Number of Attendees <span className="text-red-500">*</span>
+            {t('meeting.numAttendees')} <span className="text-red-500">*</span>
           </label>
           <input
             type="number"
-            placeholder="How many people attended?"
+            placeholder={t('meeting.numAttendees')}
             className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200 outline-none transition-all"
             value={count}
             onChange={e => setCount(parseInt(e.target.value) || 0)}
@@ -3474,25 +3462,25 @@ function EnhancedFieldMeetingGroup({ onClose }) {
         {/* Photo upload */}
         <div>
           <label className="block text-sm font-bold text-gray-700 mb-2">
-            Meeting Photos {groupPhotos.length > 0 && <span className="text-purple-600 font-normal">— {groupPhotos.length} selected</span>}
+            {t('meeting.photos')} {groupPhotos.length > 0 && <span className="text-purple-600 font-normal">— {groupPhotos.length} selected</span>}
           </label>
           <div className="border-2 border-dashed border-gray-300 rounded-xl p-3 transition-all hover:border-purple-500">
             {groupPhotos.length === 0 && (
               <div className="flex flex-col items-center gap-1 py-2">
                 <Camera size={28} className="text-gray-400" />
-                <p className="text-xs text-gray-500">Multiple photos allowed · JPG, PNG, WEBP</p>
+                <p className="text-xs text-gray-500">{t('common.multiplePhotos')}</p>
               </div>
             )}
             <div className="flex gap-2 justify-center mt-2">
               <label className="cursor-pointer flex-1">
                 <div className="flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-lg font-bold text-sm hover:from-purple-600 hover:to-pink-700 transition-all text-center">
-                  <Upload size={14} />Gallery
+                  <Upload size={14} />{t('common.gallery')}
                 </div>
                 <input type="file" accept="image/*" multiple onChange={handlePhotoChange} className="hidden" />
               </label>
               <label className="cursor-pointer flex-1">
                 <div className="flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-lg font-bold text-sm hover:from-emerald-600 hover:to-teal-700 transition-all text-center">
-                  <Camera size={14} />Take Photo
+                  <Camera size={14} />{t('common.takePhoto')}
                 </div>
                 <input type="file" accept="image/*" capture="environment" onChange={handlePhotoChange} className="hidden" />
               </label>
@@ -3519,14 +3507,14 @@ function EnhancedFieldMeetingGroup({ onClose }) {
           onClick={onClose}
           className="flex-1 py-3 bg-gradient-to-br from-gray-100 to-gray-200 hover:from-gray-200 hover:to-gray-300 text-gray-800 rounded-xl font-bold transition-all shadow-sm hover:shadow"
         >
-          Cancel
+          {t('common.cancel')}
         </button>
         <button
           onClick={submit}
           disabled={loading || !village.trim() || count === 0}
           className="flex-1 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-xl font-bold transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {loading ? "Saving..." : "Save Meeting"}
+          {loading ? t('common.saving') : t('field.saveMeeting')}
         </button>
       </div>
     </div>
@@ -3535,6 +3523,7 @@ function EnhancedFieldMeetingGroup({ onClose }) {
 
 /* ================= ENHANCED SALE FORM ================= */
 function EnhancedSaleForm({ onClose }) {
+  const { t } = useTranslation()
   const [formData, setFormData] = useState({
     productName: "",
     quantity: "",
@@ -3652,7 +3641,7 @@ function EnhancedSaleForm({ onClose }) {
       const response = await api("/field/sale", "POST", saleData)
       console.log("Sale response:", response)
 
-      showNotification("success", "Sale recorded successfully!")
+      showNotification("success", t('field.saleLogged'))
       setFormData({
         productName: "",
         quantity: "",
@@ -3686,7 +3675,7 @@ function EnhancedSaleForm({ onClose }) {
       }
 
       console.error("Full error details:", error)
-      showNotification("error", "Failed to record sale: " + errorMessage)
+      showNotification("error", t('field.saleFailed') + errorMessage)
       setLoading(false)
     }
   }
@@ -3695,8 +3684,8 @@ function EnhancedSaleForm({ onClose }) {
     <div id="sale-form" className="bg-white rounded-2xl sm:rounded-3xl shadow-lg sm:shadow-xl p-6 sm:p-8 border-2 border-blue-200 mb-6 sm:mb-8 animate-slideInUp">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h2 className="text-xl sm:text-2xl font-black text-gray-800">Record Sale</h2>
-          <p className="text-sm text-gray-600 mt-1">Log new sales transaction</p>
+          <h2 className="text-xl sm:text-2xl font-black text-gray-800">{t('sale.title')}</h2>
+          <p className="text-sm text-gray-600 mt-1">{t('field.recordSaleSub')}</p>
         </div>
         <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-100 rounded-full">
           <X size={24} />
@@ -3705,42 +3694,42 @@ function EnhancedSaleForm({ onClose }) {
 
       <div className="space-y-4 sm:space-y-5">
         <div>
-          <label className="block text-sm font-bold text-gray-700 mb-2">Sale Type</label>
+          <label className="block text-sm font-bold text-gray-700 mb-2">{t('sale.b2cFarmer').split('(')[0].trim()} / {t('sale.b2bDistributor').split('(')[0].trim()}</label>
           <div className="flex gap-2">
             <button
               onClick={() => {
                 setFormData({ ...formData, saleType: "B2C" })
-                setErrors({}) // Clear errors on switch
+                setErrors({})
               }}
               className={`flex-1 py-2 sm:py-3 rounded-lg sm:rounded-xl font-bold transition-all ${formData.saleType === "B2C"
                 ? 'bg-blue-600 text-white shadow-lg'
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
             >
-              B2C (Customer)
+              {t('sale.b2cFarmer')}
             </button>
             <button
               onClick={() => {
                 setFormData({ ...formData, saleType: "B2B" })
-                setErrors({}) // Clear errors on switch
+                setErrors({})
               }}
               className={`flex-1 py-2 sm:py-3 rounded-lg sm:rounded-xl font-bold transition-all ${formData.saleType === "B2B"
                 ? 'bg-blue-600 text-white shadow-lg'
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
             >
-              B2B (Distributor)
+              {t('sale.b2bDistributor')}
             </button>
           </div>
         </div>
 
         <div>
-          <label className="block text-sm font-bold text-gray-700 mb-2">Product Name <span className="text-red-500">*</span></label>
+          <label className="block text-sm font-bold text-gray-700 mb-2">{t('sale.productName')} <span className="text-red-500">*</span></label>
           <input
             type="text"
             value={formData.productName}
             onChange={e => setFormData({ ...formData, productName: e.target.value })}
-            placeholder="e.g., Pesticide XYZ, Fertilizer ABC, Seeds Type"
+            placeholder={t('sale.productName')}
             className={`w-full px-4 py-3 border-2 rounded-lg sm:rounded-xl focus:ring-2 outline-none transition-all ${errors.productName
               ? 'border-red-500 focus:border-red-500 focus:ring-red-200'
               : 'border-gray-300 focus:border-blue-500 focus:ring-blue-200'
@@ -3753,11 +3742,11 @@ function EnhancedSaleForm({ onClose }) {
 
         <div className="grid grid-cols-3 gap-2 sm:gap-4">
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2">Quantity <span className="text-red-500">*</span></label>
+            <label className="block text-sm font-bold text-gray-700 mb-2">{t('sale.quantity')} <span className="text-red-500">*</span></label>
             <input
               type="number"
               min="1"
-              placeholder="Enter quantity"
+              placeholder={t('sale.quantity')}
               value={formData.quantity}
               onChange={e => setFormData({ ...formData, quantity: e.target.value })}
               className={`w-full px-3 sm:px-4 py-2 sm:py-3 border-2 rounded-lg sm:rounded-xl focus:ring-2 outline-none transition-all ${errors.quantity
@@ -3770,14 +3759,14 @@ function EnhancedSaleForm({ onClose }) {
             )}
           </div>
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2">Price <span className="text-red-500">*</span></label>
+            <label className="block text-sm font-bold text-gray-700 mb-2">{t('sale.pricePerUnit')} <span className="text-red-500">*</span></label>
             <input
               type="number"
               min="0"
               step="0.01"
               value={formData.price}
               onChange={e => setFormData({ ...formData, price: e.target.value === '' ? '' : e.target.value })}
-              placeholder="Per unit"
+              placeholder={t('sale.pricePerUnit')}
               className={`w-full px-3 sm:px-4 py-2 sm:py-3 border-2 rounded-lg sm:rounded-xl focus:ring-2 outline-none transition-all ${errors.price
                 ? 'border-red-500 focus:border-red-500 focus:ring-red-200'
                 : 'border-gray-300 focus:border-blue-500 focus:ring-blue-200'
@@ -3788,7 +3777,7 @@ function EnhancedSaleForm({ onClose }) {
             )}
           </div>
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2">Total Amount</label>
+            <label className="block text-sm font-bold text-gray-700 mb-2">{t('sale.totalAmount')}</label>
             <div className="px-3 sm:px-4 py-2 sm:py-3 bg-blue-50 border-2 border-blue-300 rounded-lg sm:rounded-xl">
               <p className="text-lg sm:text-2xl font-black text-blue-700">Rs.{totalAmount.toLocaleString()}</p>
             </div>
@@ -3797,12 +3786,12 @@ function EnhancedSaleForm({ onClose }) {
 
         {formData.saleType === "B2C" && (
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2">Customer Name <span className="text-red-500">*</span></label>
+            <label className="block text-sm font-bold text-gray-700 mb-2">{t('sale.farmerName')} <span className="text-red-500">*</span></label>
             <input
               type="text"
               value={formData.farmerName}
               onChange={e => setFormData({ ...formData, farmerName: e.target.value })}
-              placeholder="Enter customer name"
+              placeholder={t('sale.farmerName')}
               className={`w-full px-4 py-3 border-2 rounded-lg sm:rounded-xl focus:ring-2 outline-none transition-all ${errors.farmerName
                 ? 'border-red-500 focus:border-red-500 focus:ring-red-200'
                 : 'border-gray-300 focus:border-blue-500 focus:ring-blue-200'
@@ -3816,12 +3805,12 @@ function EnhancedSaleForm({ onClose }) {
 
         {formData.saleType === "B2B" && (
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2">Distributor Name <span className="text-red-500">*</span></label>
+            <label className="block text-sm font-bold text-gray-700 mb-2">{t('sale.distributorName')} <span className="text-red-500">*</span></label>
             <input
               type="text"
               value={formData.distributorName}
               onChange={e => setFormData({ ...formData, distributorName: e.target.value })}
-              placeholder="Enter distributor name"
+              placeholder={t('sale.distributorName')}
               className={`w-full px-4 py-3 border-2 rounded-lg sm:rounded-xl focus:ring-2 outline-none transition-all ${errors.distributorName
                 ? 'border-red-500 focus:border-red-500 focus:ring-red-200'
                 : 'border-gray-300 focus:border-blue-500 focus:ring-blue-200'
@@ -3835,7 +3824,7 @@ function EnhancedSaleForm({ onClose }) {
 
         <div>
           <label className="block text-sm font-bold text-gray-700 mb-2">
-            Sale Photos (Optional) {photos.length > 0 && <span className="text-blue-600 font-normal">— {photos.length} selected</span>}
+            {t('sale.photos')} {photos.length > 0 && <span className="text-blue-600 font-normal">— {photos.length} selected</span>}
           </label>
           <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 transition-all hover:border-blue-500 focus-within:border-blue-500">
             <div className="flex flex-col items-center justify-center gap-3">
@@ -3843,17 +3832,15 @@ function EnhancedSaleForm({ onClose }) {
                 <>
                   <Camera size={32} className="text-gray-400" />
                   <div className="text-center">
-                    <p className="text-sm text-gray-600 mb-1">Upload or capture product photos</p>
-                    <p className="text-xs text-gray-500">Multiple photos allowed · JPG, PNG, WEBP</p>
+                    <p className="text-xs text-gray-500">{t('common.multiplePhotos')}</p>
                   </div>
                 </>
               )}
-              {/* Two side-by-side buttons: gallery + camera */}
               <div className="flex gap-2 w-full justify-center">
                 <label className="cursor-pointer flex-1">
                   <div className="flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-blue-500 to-cyan-600 text-white rounded-lg font-bold text-sm hover:from-blue-600 hover:to-cyan-700 transition-all text-center">
                     <Upload size={14} />
-                    Gallery
+                    {t('common.gallery')}
                   </div>
                   <input
                     type="file"
@@ -3866,7 +3853,7 @@ function EnhancedSaleForm({ onClose }) {
                 <label className="cursor-pointer flex-1">
                   <div className="flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-lg font-bold text-sm hover:from-emerald-600 hover:to-teal-700 transition-all text-center">
                     <Camera size={14} />
-                    Take Photo
+                    {t('common.takePhoto')}
                   </div>
                   <input
                     type="file"
@@ -3878,7 +3865,6 @@ function EnhancedSaleForm({ onClose }) {
                 </label>
               </div>
             </div>
-            {/* Thumbnail grid */}
             {photos.length > 0 && (
               <div className="grid grid-cols-3 gap-2 mt-3">
                 {photos.map((p, i) => (
@@ -3900,43 +3886,43 @@ function EnhancedSaleForm({ onClose }) {
 
         <div className="grid grid-cols-3 gap-2 sm:gap-4">
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2">Village</label>
+            <label className="block text-sm font-bold text-gray-700 mb-2">{t('sale.village')}</label>
             <input
               type="text"
               value={formData.village}
               onChange={e => setFormData({ ...formData, village: e.target.value })}
-              placeholder="Village"
+              placeholder={t('sale.village')}
               className="w-full px-3 sm:px-4 py-2 sm:py-3 border-2 border-gray-300 rounded-lg sm:rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all"
             />
           </div>
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2">District</label>
+            <label className="block text-sm font-bold text-gray-700 mb-2">{t('sale.district')}</label>
             <input
               type="text"
               value={formData.district}
               onChange={e => setFormData({ ...formData, district: e.target.value })}
-              placeholder="District"
+              placeholder={t('sale.district')}
               className="w-full px-3 sm:px-4 py-2 sm:py-3 border-2 border-gray-300 rounded-lg sm:rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all"
             />
           </div>
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2">State</label>
+            <label className="block text-sm font-bold text-gray-700 mb-2">{t('sale.state')}</label>
             <input
               type="text"
               value={formData.state}
               onChange={e => setFormData({ ...formData, state: e.target.value })}
-              placeholder="State"
+              placeholder={t('sale.state')}
               className="w-full px-3 sm:px-4 py-2 sm:py-3 border-2 border-gray-300 rounded-lg sm:rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all"
             />
           </div>
         </div>
 
         <div>
-          <label className="block text-sm font-bold text-gray-700 mb-2">Notes</label>
+          <label className="block text-sm font-bold text-gray-700 mb-2">{t('sale.notes')}</label>
           <textarea
             value={formData.notes}
             onChange={e => setFormData({ ...formData, notes: e.target.value })}
-            placeholder="Add any notes, feedback, or special instructions..."
+            placeholder={t('sale.notes')}
             rows={3}
             className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg sm:rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all"
           />
@@ -3948,7 +3934,7 @@ function EnhancedSaleForm({ onClose }) {
           onClick={onClose}
           className="flex-1 py-3 bg-gradient-to-br from-gray-100 to-gray-200 hover:from-gray-200 hover:to-gray-300 text-gray-800 rounded-xl font-bold transition-all shadow-sm hover:shadow"
         >
-          Cancel
+          {t('common.cancel')}
         </button>
         <button
           onClick={() => {
@@ -3961,7 +3947,7 @@ function EnhancedSaleForm({ onClose }) {
           disabled={loading}
           className="flex-1 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white rounded-xl font-bold transition-all shadow-lg hover:shadow-xl disabled:opacity-50"
         >
-          {loading ? "Recording..." : "Preview & Submit"}
+          {loading ? t('common.saving') : t('sale.previewSave')}
         </button>
       </div>
 

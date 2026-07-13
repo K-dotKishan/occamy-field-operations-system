@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react"
+import { useTranslation } from "react-i18next"
 import { api, syncPendingRequests, getOfflineQueueStatus } from "../api"
 import LiveTracking from "../components/LiveTracking"
-import { MapPin, Users, Package, TrendingUp, Calendar, Camera, X, Upload, Wifi, WifiOff, RefreshCw } from "lucide-react"
+import LanguageToggle from "../components/LanguageToggle"
+import { MapPin, Users, Package, TrendingUp, Calendar, Camera, X, Upload, Wifi, WifiOff, RefreshCw, LogOut } from "lucide-react"
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000"
 
@@ -21,6 +23,7 @@ function getLocation() {
 }
 
 export default function FieldDashboard() {
+  const { t, i18n } = useTranslation()
   const [location, setLocation] = useState(null)
   const [activeDay, setActiveDay] = useState(null)
   const [showForm, setShowForm] = useState(null) // 'meeting', 'sample', 'sale', 'message'
@@ -59,7 +62,7 @@ export default function FieldDashboard() {
 
   const handleSync = async () => {
     if (!isOnline) {
-      alert("Cannot sync: No internet connection")
+      alert(t('field.cannotSync'))
       return
     }
 
@@ -68,9 +71,9 @@ export default function FieldDashboard() {
       const result = await syncPendingRequests()
       alert(`Sync Complete: ${result.count} items uploaded. ${result.failed > 0 ? result.failed + ' failed.' : ''}`)
       checkQueue()
-      loadSummary() // Refresh data after sync
+      loadSummary()
     } catch (err) {
-      alert("Sync failed")
+      alert(t('field.syncFailed'))
     } finally {
       setIsSyncing(false)
     }
@@ -89,7 +92,7 @@ export default function FieldDashboard() {
   }
 
   const startDay = async () => {
-    const odometer = prompt("Enter starting odometer reading (km):")
+    const odometer = prompt(t('field.odometerStart'))
     if (!odometer) return
 
     const coords = await getLocation()
@@ -100,16 +103,16 @@ export default function FieldDashboard() {
         location: coords,
         odometer: parseFloat(odometer)
       })
-      alert("Day started successfully!")
+      alert(t('field.attendanceStart'))
       setActiveDay(true)
       loadSummary()
     } catch (err) {
-      alert("Failed to start day: " + (err?.error || err?.message || "Unknown error"))
+      alert(t('field.saleFailed') + (err?.error || err?.message || "Unknown error"))
     }
   }
 
   const endDay = async () => {
-    const odometer = prompt("Enter ending odometer reading (km):")
+    const odometer = prompt(t('field.odometerEnd'))
     if (!odometer) return
 
     const coords = await getLocation()
@@ -119,11 +122,11 @@ export default function FieldDashboard() {
         location: coords,
         odometer: parseFloat(odometer)
       })
-      alert("Day ended successfully!")
+      alert(t('field.attendanceEnd'))
       setActiveDay(false)
       loadSummary()
     } catch (err) {
-      alert("Failed to end day: " + (err?.error || err?.message || "Unknown error"))
+      alert(t('field.saleFailed') + (err?.error || err?.message || "Unknown error"))
     }
   }
 
@@ -131,27 +134,30 @@ export default function FieldDashboard() {
     <div className="space-y-8">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-4xl font-black text-gray-800 mb-2">Field Officer Dashboard</h2>
-          <p className="text-gray-600">Track your daily activities and performance</p>
+          <h2 className="text-4xl font-black text-gray-800 mb-2">{t('field.fieldOfficer')}</h2>
+          <p className="text-gray-600">{t('field.fieldOfficerSub')}</p>
         </div>
-        {activeDay !== null && (
-          <div className={`px-6 py-3 rounded-2xl shadow-lg font-bold ${activeDay
-            ? 'bg-green-100 text-green-800 border-2 border-green-300'
-            : 'bg-gray-100 text-gray-600'
-            }`}>
-            {activeDay ? '🟢 Day Active' : '⚫ Day Ended'}
-          </div>
-        )}
+        <div className="flex items-center gap-3">
+          <LanguageToggle />
+          {activeDay !== null && (
+            <div className={`px-6 py-3 rounded-2xl shadow-lg font-bold ${activeDay
+              ? 'bg-green-100 text-green-800 border-2 border-green-300'
+              : 'bg-gray-100 text-gray-600'
+              }`}>
+              {activeDay ? t('field.dayActive') : t('field.dayEnded')}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Today's Summary */}
       {summary && (
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <SummaryCard label="Meetings" value={summary?.meetings ?? 0} icon="Meetings" color="blue" />
-          <SummaryCard label="Samples" value={summary?.samples ?? 0} icon="Samples" color="purple" />
-          <SummaryCard label="Sales" value={summary?.sales ?? 0} icon="Sales" color="green" />
-          <SummaryCard label="Revenue" value={`Rs.${(summary?.revenue ?? 0).toLocaleString()}`} icon="Revenue" color="emerald" />
-          <SummaryCard label="Distance" value={`${summary?.distanceTraveled ?? 0} km`} icon="Distance" color="amber" />
+          <SummaryCard label={t('field.meetings')} value={summary?.meetings ?? 0} icon={<Users size={24} />} />
+          <SummaryCard label={t('field.samples')} value={summary?.samples ?? 0} icon={<Package size={24} />} />
+          <SummaryCard label={t('field.salesLabel')} value={summary?.sales ?? 0} icon={<TrendingUp size={24} />} />
+          <SummaryCard label={t('field.revenue')} value={`Rs.${(summary?.revenue ?? 0).toLocaleString()}`} icon={<span className="text-xl font-black">₹</span>} />
+          <SummaryCard label={t('field.distance')} value={`${summary?.distanceTraveled ?? 0} km`} icon={<MapPin size={24} />} />
         </div>
       )}
 
@@ -160,16 +166,16 @@ export default function FieldDashboard() {
         {!activeDay ? (
           <ActionButton
             icon={<MapPin size={24} />}
-            label="Start Day"
-            subtitle="Mark attendance & GPS"
+            label={t('field.startDay')}
+            subtitle={t('field.startDaySub')}
             color="from-blue-500 to-blue-700"
             onClick={startDay}
           />
         ) : (
           <ActionButton
             icon={<MapPin size={24} />}
-            label="End Day"
-            subtitle="Complete attendance"
+            label={t('field.endDay')}
+            subtitle={t('field.endDaySub')}
             color="from-red-500 to-red-700"
             onClick={endDay}
           />
@@ -177,8 +183,8 @@ export default function FieldDashboard() {
 
         <ActionButton
           icon={<Users size={24} />}
-          label="Log Meeting"
-          subtitle="Record interactions"
+          label={t('field.logMeeting')}
+          subtitle={t('field.logMeetingSub')}
           color="from-indigo-500 to-indigo-700"
           onClick={() => setShowForm('meeting')}
           disabled={!activeDay}
@@ -186,8 +192,8 @@ export default function FieldDashboard() {
 
         <ActionButton
           icon={<Package size={24} />}
-          label="Distribute Sample"
-          subtitle="Track sample distribution"
+          label={t('field.distributeSample')}
+          subtitle={t('field.distributeSampleSub')}
           color="from-purple-500 to-purple-700"
           onClick={() => setShowForm('sample')}
           disabled={!activeDay}
@@ -195,8 +201,8 @@ export default function FieldDashboard() {
 
         <ActionButton
           icon={<TrendingUp size={24} />}
-          label="Record Sale"
-          subtitle="Log new transaction"
+          label={t('field.recordSale')}
+          subtitle={t('field.recordSaleSub')}
           color="from-emerald-500 to-emerald-700"
           onClick={() => setShowForm('sale')}
           disabled={!activeDay}
@@ -204,8 +210,8 @@ export default function FieldDashboard() {
 
         <ActionButton
           icon={<span className="text-2xl">💬</span>}
-          label="Send Message"
-          subtitle="Send updates to admin"
+          label={t('field.sendMessage')}
+          subtitle={t('field.sendMessageSub')}
           color="from-cyan-500 to-blue-700"
           onClick={() => setShowForm('message')}
           disabled={!activeDay}
@@ -247,7 +253,7 @@ function ActionButton({ icon, label, subtitle, color, onClick, disabled }) {
   )
 }
 
-function SummaryCard({ label, value, icon, color }) {
+function SummaryCard({ label, value, icon }) {
   return (
     <div className="bg-gradient-to-br from-[#3b758c] to-[#1797a6] text-white p-6 rounded-2xl shadow-md hover:opacity-90 transition-all">
       <div className="flex justify-between items-start mb-2">
@@ -262,6 +268,7 @@ function SummaryCard({ label, value, icon, color }) {
 /* ================= MEETING FORM ================= */
 
 function MeetingForm({ onClose }) {
+  const { t } = useTranslation()
   const [meetingType, setMeetingType] = useState("ONE_TO_ONE")
   const [formData, setFormData] = useState({
     personName: "",
@@ -333,18 +340,18 @@ function MeetingForm({ onClose }) {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || `Server error ${res.status}`)
 
-      alert("Meeting logged successfully!")
+      alert(t('field.meetingLogged'))
       onClose()
     } catch (err) {
       console.error("Meeting log error:", err)
-      alert("Failed to log meeting: " + (err.message || "Unknown error"))
+      alert(t('field.meetingFailed') + (err.message || "Unknown error"))
     }
   }
 
   return (
     <div className="bg-white p-8 rounded-3xl shadow-2xl border-2 border-indigo-200">
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-black text-gray-800">Log Meeting</h2>
+        <h2 className="text-2xl font-black text-gray-800">{t('meeting.title')}</h2>
         <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
           <X size={24} />
         </button>
@@ -359,7 +366,7 @@ function MeetingForm({ onClose }) {
             : 'text-gray-600 hover:text-gray-800'
             }`}
         >
-          One-to-One
+          {t('meeting.oneToOne')}
         </button>
         <button
           onClick={() => setMeetingType("GROUP")}
@@ -368,42 +375,40 @@ function MeetingForm({ onClose }) {
             : 'text-gray-600 hover:text-gray-800'
             }`}
         >
-          Group Meeting
+          {t('meeting.group')}
         </button>
       </div>
 
       <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
         {meetingType === "ONE_TO_ONE" ? (
           <>
-            <Input label="Person Name" value={formData.personName} onChange={v => setFormData({ ...formData, personName: v })} required />
-            <Input label="Contact Number" type="tel" value={formData.contactNumber} onChange={v => setFormData({ ...formData, contactNumber: v })} />
-            <Select label="Category" value={formData.category} onChange={v => setFormData({ ...formData, category: v })} options={["FARMER", "SELLER", "INFLUENCER", "VETERINARIAN", "DISTRIBUTOR", "DEALER", "RETAIL_OUTLET", "KVK", "FPO", "DDB"]} />
-            <Input label="Estimated Volume (kg)" type="number" value={formData.estimatedVolume} onChange={v => setFormData({ ...formData, estimatedVolume: v })} />
-            <Select label="Business Likelihood" value={formData.likelihood} onChange={v => setFormData({ ...formData, likelihood: v })} options={["LOW", "MEDIUM", "HIGH"]} />
-            <Input label="Date of Receipt" type="date" value={formData.dateOfReceipt} onChange={v => setFormData({ ...formData, dateOfReceipt: v })} />
-            <Input label="Date of Sale" type="date" value={formData.dateOfSale} onChange={v => setFormData({ ...formData, dateOfSale: v })} />
-            <Input label="Quantity Received" type="number" value={formData.quantityReceived} onChange={v => setFormData({ ...formData, quantityReceived: v })} />
-            <Input label="Quantity Sold" type="number" value={formData.quantitySold} onChange={v => setFormData({ ...formData, quantitySold: v })} />
+            <Input label={t('meeting.personName')} value={formData.personName} onChange={v => setFormData({ ...formData, personName: v })} required />
+            <Input label={t('meeting.contactNumber')} type="tel" value={formData.contactNumber} onChange={v => setFormData({ ...formData, contactNumber: v })} />
+            <Select label={t('meeting.category')} value={formData.category} onChange={v => setFormData({ ...formData, category: v })} options={["FARMER", "SELLER", "INFLUENCER", "VETERINARIAN", "DISTRIBUTOR", "DEALER", "RETAIL_OUTLET", "KVK", "FPO", "DDB"]} />
+            <Input label={t('meeting.estimatedVolume')} type="number" value={formData.estimatedVolume} onChange={v => setFormData({ ...formData, estimatedVolume: v })} />
+            <Select label={t('meeting.likelihood')} value={formData.likelihood} onChange={v => setFormData({ ...formData, likelihood: v })} options={["LOW", "MEDIUM", "HIGH"]} />
+            <Input label={t('meeting.dateOfReceipt')} type="date" value={formData.dateOfReceipt} onChange={v => setFormData({ ...formData, dateOfReceipt: v })} />
+            <Input label={t('meeting.dateOfSale')} type="date" value={formData.dateOfSale} onChange={v => setFormData({ ...formData, dateOfSale: v })} />
+            <Input label={t('meeting.quantityReceived')} type="number" value={formData.quantityReceived} onChange={v => setFormData({ ...formData, quantityReceived: v })} />
+            <Input label={t('meeting.quantitySold')} type="number" value={formData.quantitySold} onChange={v => setFormData({ ...formData, quantitySold: v })} />
           </>
         ) : (
           <>
-            <Input label="Village" value={formData.village} onChange={v => setFormData({ ...formData, village: v })} required />
-            <Input label="Number of Attendees" type="number" value={formData.attendeesCount} onChange={v => setFormData({ ...formData, attendeesCount: v })} required />
-            <Select label="Category" value={formData.category} onChange={v => setFormData({ ...formData, category: v })} options={["FARMER", "SELLER", "INFLUENCER", "VETERINARIAN", "DISTRIBUTOR", "DEALER", "RETAIL_OUTLET", "KVK", "FPO", "DDB"]} />
-            <Select label="Meeting Type" value={formData.meetingType} onChange={v => setFormData({ ...formData, meetingType: v })} options={["DEMO", "TRAINING", "FEEDBACK", "AWARENESS"]} />
-            <Input label="Date of Receipt" type="date" value={formData.dateOfReceipt} onChange={v => setFormData({ ...formData, dateOfReceipt: v })} />
-            <Input label="Date of Sale" type="date" value={formData.dateOfSale} onChange={v => setFormData({ ...formData, dateOfSale: v })} />
-            <Input label="Quantity Received" type="number" value={formData.quantityReceived} onChange={v => setFormData({ ...formData, quantityReceived: v })} />
-            <Input label="Quantity Sold" type="number" value={formData.quantitySold} onChange={v => setFormData({ ...formData, quantitySold: v })} />
+            <Input label={t('meeting.village')} value={formData.village} onChange={v => setFormData({ ...formData, village: v })} required />
+            <Input label={t('meeting.numAttendees')} type="number" value={formData.attendeesCount} onChange={v => setFormData({ ...formData, attendeesCount: v })} required />
+            <Select label={t('meeting.category')} value={formData.category} onChange={v => setFormData({ ...formData, category: v })} options={["FARMER", "SELLER", "INFLUENCER", "VETERINARIAN", "DISTRIBUTOR", "DEALER", "RETAIL_OUTLET", "KVK", "FPO", "DDB"]} />
+            <Select label={t('meeting.meetingType')} value={formData.meetingType} onChange={v => setFormData({ ...formData, meetingType: v })} options={["DEMO", "TRAINING", "FEEDBACK", "AWARENESS"]} />
+            <Input label={t('meeting.dateOfReceipt')} type="date" value={formData.dateOfReceipt} onChange={v => setFormData({ ...formData, dateOfReceipt: v })} />
+            <Input label={t('meeting.dateOfSale')} type="date" value={formData.dateOfSale} onChange={v => setFormData({ ...formData, dateOfSale: v })} />
+            <Input label={t('meeting.quantityReceived')} type="number" value={formData.quantityReceived} onChange={v => setFormData({ ...formData, quantityReceived: v })} />
+            <Input label={t('meeting.quantitySold')} type="number" value={formData.quantitySold} onChange={v => setFormData({ ...formData, quantitySold: v })} />
           </>
         )}
 
-        <Input label="District" value={formData.district} onChange={v => setFormData({ ...formData, district: v })} />
-        <Input label="State" value={formData.state} onChange={v => setFormData({ ...formData, state: v })} />
-        <Textarea label="Notes" value={formData.notes} onChange={v => setFormData({ ...formData, notes: v })} rows={4} />
-
-        <FileUpload label="Photos" onChange={setPhotos} accept="image/*" multiple />
-
+        <Input label={t('meeting.district')} value={formData.district} onChange={v => setFormData({ ...formData, district: v })} />
+        <Input label={t('meeting.state')} value={formData.state} onChange={v => setFormData({ ...formData, state: v })} />
+        <Textarea label={t('meeting.notes')} value={formData.notes} onChange={v => setFormData({ ...formData, notes: v })} rows={4} />
+        <FileUpload label={t('meeting.photos')} onChange={setPhotos} accept="image/*" multiple />
         <label className="flex items-center gap-2">
           <input
             type="checkbox"
@@ -411,16 +416,16 @@ function MeetingForm({ onClose }) {
             onChange={e => setFormData({ ...formData, followUpRequired: e.target.checked })}
             className="w-4 h-4"
           />
-          <span className="text-sm font-semibold text-gray-700">Requires Follow-up</span>
+          <span className="text-sm font-semibold text-gray-700">{t('meeting.followUp')}</span>
         </label>
       </div>
 
       <div className="flex gap-3 mt-6">
         <button onClick={onClose} className="flex-1 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-xl font-bold transition-all">
-          Cancel
+          {t('common.cancel')}
         </button>
         <button onClick={handleSubmit} className="flex-1 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl font-bold transition-all shadow-lg">
-          Save Meeting
+          {t('field.saveMeeting')}
         </button>
       </div>
     </div>
@@ -430,6 +435,7 @@ function MeetingForm({ onClose }) {
 /* ================= SAMPLE FORM ================= */
 
 function SampleForm({ onClose }) {
+  const { t } = useTranslation()
   const [formData, setFormData] = useState({
     productName: "",
     productSKU: "",
@@ -470,49 +476,46 @@ function SampleForm({ onClose }) {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || `Server error ${res.status}`)
 
-      alert("Sample distribution logged!")
+      alert(t('field.sampleLogged'))
       onClose()
     } catch (err) {
       console.error("Sample log error:", err)
-      alert("Failed to log sample: " + (err.message || "Unknown error"))
+      alert(t('field.sampleFailed') + (err.message || "Unknown error"))
     }
   }
 
   return (
     <div className="bg-white p-8 rounded-3xl shadow-2xl border-2 border-purple-200">
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-black text-gray-800">Distribute Sample</h2>
+        <h2 className="text-2xl font-black text-gray-800">{t('sample.title')}</h2>
         <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
           <X size={24} />
         </button>
       </div>
 
       <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
-        <Input label="Product Name" value={formData.productName} onChange={v => setFormData({ ...formData, productName: v })} required />
-        <Input label="Product SKU" value={formData.productSKU} onChange={v => setFormData({ ...formData, productSKU: v })} />
+        <Input label={t('sample.productName')} value={formData.productName} onChange={v => setFormData({ ...formData, productName: v })} required />
+        <Input label={t('sample.productSKU')} value={formData.productSKU} onChange={v => setFormData({ ...formData, productSKU: v })} />
         <div className="grid grid-cols-2 gap-4">
-          <Input label="Quantity" type="number" value={formData.quantity} onChange={v => setFormData({ ...formData, quantity: v })} required />
-          <Select label="Unit" value={formData.unit} onChange={v => setFormData({ ...formData, unit: v })} options={["kg", "litre", "packet", "unit"]} />
+          <Input label={t('sample.quantity')} type="number" value={formData.quantity} onChange={v => setFormData({ ...formData, quantity: v })} required />
+          <Select label={t('sample.unit')} value={formData.unit} onChange={v => setFormData({ ...formData, unit: v })} options={["kg", "litre", "packet", "unit"]} />
         </div>
-
-        <Input label="Recipient Name" value={formData.recipientName} onChange={v => setFormData({ ...formData, recipientName: v })} required />
-        <Input label="Recipient Contact" type="tel" value={formData.recipientContact} onChange={v => setFormData({ ...formData, recipientContact: v })} />
-        <Select label="Recipient Category" value={formData.recipientCategory} onChange={v => setFormData({ ...formData, recipientCategory: v })} options={["FARMER", "SELLER", "INFLUENCER", "VETERINARIAN"]} />
-        <Select label="Purpose" value={formData.purpose} onChange={v => setFormData({ ...formData, purpose: v })} options={["TRIAL", "DEMO", "TRAINING", "FOLLOWUP"]} />
-
-        <Input label="Village" value={formData.village} onChange={v => setFormData({ ...formData, village: v })} />
-        <Input label="District" value={formData.district} onChange={v => setFormData({ ...formData, district: v })} />
-        <Input label="State" value={formData.state} onChange={v => setFormData({ ...formData, state: v })} />
-
-        <FileUpload label="Photos" onChange={setPhotos} accept="image/*" multiple />
+        <Input label={t('sample.recipientName')} value={formData.recipientName} onChange={v => setFormData({ ...formData, recipientName: v })} required />
+        <Input label={t('sample.recipientContact')} type="tel" value={formData.recipientContact} onChange={v => setFormData({ ...formData, recipientContact: v })} />
+        <Select label={t('sample.recipientCategory')} value={formData.recipientCategory} onChange={v => setFormData({ ...formData, recipientCategory: v })} options={["FARMER", "SELLER", "INFLUENCER", "VETERINARIAN"]} />
+        <Select label={t('sample.purpose')} value={formData.purpose} onChange={v => setFormData({ ...formData, purpose: v })} options={["TRIAL", "DEMO", "TRAINING", "FOLLOWUP"]} />
+        <Input label={t('sample.village')} value={formData.village} onChange={v => setFormData({ ...formData, village: v })} />
+        <Input label={t('sample.district')} value={formData.district} onChange={v => setFormData({ ...formData, district: v })} />
+        <Input label={t('sample.state')} value={formData.state} onChange={v => setFormData({ ...formData, state: v })} />
+        <FileUpload label={t('sample.photos')} onChange={setPhotos} accept="image/*" multiple />
       </div>
 
       <div className="flex gap-3 mt-6">
         <button onClick={onClose} className="flex-1 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-xl font-bold transition-all">
-          Cancel
+          {t('common.cancel')}
         </button>
         <button onClick={handleSubmit} className="flex-1 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-xl font-bold transition-all shadow-lg">
-          Save Sample
+          {t('field.saveSample')}
         </button>
       </div>
     </div>
@@ -522,6 +525,7 @@ function SampleForm({ onClose }) {
 /* ================= SALE FORM ================= */
 
 function SaleForm({ onClose }) {
+  const { t } = useTranslation()
   const [saleType, setSaleType] = useState("B2C")
   const [formData, setFormData] = useState({
     productName: "",
@@ -572,11 +576,11 @@ function SaleForm({ onClose }) {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || `Server error ${res.status}`)
 
-      alert("Sale recorded successfully!")
+      alert(t('field.saleLogged'))
       onClose()
     } catch (err) {
       console.error("Sale log error:", err)
-      alert("Failed to record sale: " + (err.message || "Unknown error"))
+      alert(t('field.saleFailed') + (err.message || "Unknown error"))
     }
   }
 
@@ -599,32 +603,32 @@ function SaleForm({ onClose }) {
                 <div className={`px-3 py-1 rounded-full text-xs font-black ${saleType === 'B2C' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
                   {saleType}
                 </div>
-                <h2 className="text-xl font-black text-gray-800">Order Preview</h2>
+                <h2 className="text-xl font-black text-gray-800">{t('sale.orderPreview')}</h2>
               </div>
 
               {/* Total highlight */}
               <div className="bg-emerald-50 border-2 border-emerald-200 rounded-2xl p-4 mb-5 text-center">
-                <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Total Amount</p>
+                <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">{t('sale.totalAmount')}</p>
                 <p className="text-4xl font-black text-emerald-700">₹{totalAmount.toLocaleString()}</p>
                 <p className="text-xs text-gray-500 mt-1">{formData.quantity} × ₹{formData.pricePerUnit} per unit</p>
               </div>
 
               <div className="space-y-0">
-                <PreviewRow label="Product" value={formData.productName} />
-                <PreviewRow label="SKU" value={formData.productSKU} />
-                <PreviewRow label="Pack Size" value={formData.packSize} />
-                <PreviewRow label="Quantity" value={formData.quantity} />
-                <PreviewRow label="Price / Unit" value={formData.pricePerUnit ? `₹${formData.pricePerUnit}` : null} />
-                <PreviewRow label={saleType === 'B2C' ? 'Farmer Name' : 'Distributor Name'} value={formData.customerName} />
-                <PreviewRow label="Contact" value={formData.customerContact} />
-                {saleType === 'B2B' && <PreviewRow label="Distributor Type" value={formData.distributorType} />}
-                <PreviewRow label="Payment Mode" value={formData.paymentMode} />
-                <PreviewRow label="Village" value={formData.village} />
-                <PreviewRow label="District" value={formData.district} />
-                <PreviewRow label="State" value={formData.state} />
-                <PreviewRow label="Notes" value={formData.notes} />
-                <PreviewRow label="Repeat Order" value={formData.isRepeatOrder ? 'Yes' : null} />
-                {photos.length > 0 && <PreviewRow label="Photos" value={`${photos.length} attached`} />}
+                <PreviewRow label={t('sale.product')} value={formData.productName} />
+                <PreviewRow label={t('sale.sku')} value={formData.productSKU} />
+                <PreviewRow label={t('sale.packSize')} value={formData.packSize} />
+                <PreviewRow label={t('sale.quantity')} value={formData.quantity} />
+                <PreviewRow label={t('sale.pricePerUnit')} value={formData.pricePerUnit ? `₹${formData.pricePerUnit}` : null} />
+                <PreviewRow label={saleType === 'B2C' ? t('sale.farmerName') : t('sale.distributorName')} value={formData.customerName} />
+                <PreviewRow label={t('sale.contact')} value={formData.customerContact} />
+                {saleType === 'B2B' && <PreviewRow label={t('sale.distributorType')} value={formData.distributorType} />}
+                <PreviewRow label={t('sale.paymentMode')} value={formData.paymentMode} />
+                <PreviewRow label={t('sale.village')} value={formData.village} />
+                <PreviewRow label={t('sale.district')} value={formData.district} />
+                <PreviewRow label={t('sale.state')} value={formData.state} />
+                <PreviewRow label={t('sale.notes')} value={formData.notes} />
+                <PreviewRow label={t('sale.repeatOrder')} value={formData.isRepeatOrder ? t('common.save') : null} />
+                {photos.length > 0 && <PreviewRow label={t('sale.photos')} value={`${photos.length} attached`} />}
               </div>
 
               <div className="flex gap-3 mt-6">
@@ -632,13 +636,13 @@ function SaleForm({ onClose }) {
                   onClick={() => setShowPreview(false)}
                   className="flex-1 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-xl font-bold transition-all"
                 >
-                  ← Edit / Back
+                  {t('sale.editBack')}
                 </button>
                 <button
                   onClick={() => { setShowPreview(false); handleSubmit() }}
                   className="flex-1 py-3 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-xl font-bold transition-all shadow-lg"
                 >
-                  Confirm & Submit
+                  {t('sale.confirmSubmit')}
                 </button>
               </div>
             </div>
@@ -649,7 +653,7 @@ function SaleForm({ onClose }) {
       {/* ── FORM ──────────────────────────────────────────────────────────── */}
       <div className="bg-white p-8 rounded-3xl shadow-2xl border-2 border-emerald-200">
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-black text-gray-800">Record Sale</h2>
+        <h2 className="text-2xl font-black text-gray-800">{t('sale.title')}</h2>
         <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
           <X size={24} />
         </button>
@@ -664,7 +668,7 @@ function SaleForm({ onClose }) {
             : 'text-gray-600 hover:text-gray-800'
             }`}
         >
-          B2C (Farmer)
+          {t('sale.b2cFarmer')}
         </button>
         <button
           onClick={() => setSaleType("B2B")}
@@ -673,59 +677,54 @@ function SaleForm({ onClose }) {
             : 'text-gray-600 hover:text-gray-800'
             }`}
         >
-          B2B (Distributor)
+          {t('sale.b2bDistributor')}
         </button>
       </div>
 
       <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
-        <Input label="Product Name" value={formData.productName} onChange={v => setFormData({ ...formData, productName: v })} required />
-        <Input label="Product SKU" value={formData.productSKU} onChange={v => setFormData({ ...formData, productSKU: v })} />
-        <Input label="Pack Size" value={formData.packSize} onChange={v => setFormData({ ...formData, packSize: v })} placeholder="e.g., 1kg, 5kg, 500ml" />
+        <Input label={t('sale.productName')} value={formData.productName} onChange={v => setFormData({ ...formData, productName: v })} required />
+        <Input label={t('sale.productSKU')} value={formData.productSKU} onChange={v => setFormData({ ...formData, productSKU: v })} />
+        <Input label={t('sale.packSize')} value={formData.packSize} onChange={v => setFormData({ ...formData, packSize: v })} placeholder="e.g., 1kg, 5kg, 500ml" />
 
         <div className="grid grid-cols-2 gap-4">
-          <Input label="Quantity" type="number" value={formData.quantity} onChange={v => setFormData({ ...formData, quantity: v })} required />
-          <Input label="Price per Unit (₹)" type="number" value={formData.pricePerUnit} onChange={v => setFormData({ ...formData, pricePerUnit: v })} required />
+          <Input label={t('sale.quantity')} type="number" value={formData.quantity} onChange={v => setFormData({ ...formData, quantity: v })} required />
+          <Input label={t('sale.pricePerUnit')} type="number" value={formData.pricePerUnit} onChange={v => setFormData({ ...formData, pricePerUnit: v })} required />
         </div>
 
         <div className="bg-emerald-50 p-4 rounded-xl border-2 border-emerald-200">
-          <p className="text-sm text-gray-600">Total Amount</p>
+          <p className="text-sm text-gray-600">{t('sale.totalAmount')}</p>
           <p className="text-3xl font-black text-emerald-700">₹{totalAmount.toLocaleString()}</p>
         </div>
 
-        <Input label={saleType === "B2C" ? "Farmer Name" : "Distributor Name"} value={formData.customerName} onChange={v => setFormData({ ...formData, customerName: v })} required />
-        <Input label="Contact Number" type="tel" value={formData.customerContact} onChange={v => setFormData({ ...formData, customerContact: v })} />
+        <Input label={saleType === "B2C" ? t('sale.farmerName') : t('sale.distributorName')} value={formData.customerName} onChange={v => setFormData({ ...formData, customerName: v })} required />
+        <Input label={t('sale.contactNumber')} type="tel" value={formData.customerContact} onChange={v => setFormData({ ...formData, customerContact: v })} />
 
         {saleType === "B2B" && (
-          <Select label="Distributor Type" value={formData.distributorType} onChange={v => setFormData({ ...formData, distributorType: v })} options={["RETAILER", "WHOLESALER", "AGENT", "OTHER"]} />
+          <Select label={t('sale.distributorType')} value={formData.distributorType} onChange={v => setFormData({ ...formData, distributorType: v })} options={["RETAILER", "WHOLESALER", "AGENT", "OTHER"]} />
         )}
 
-        <Select label="Payment Mode" value={formData.paymentMode} onChange={v => setFormData({ ...formData, paymentMode: v })} options={["CASH", "UPI", "CREDIT", "BANK_TRANSFER"]} />
+        <Select label={t('sale.paymentMode')} value={formData.paymentMode} onChange={v => setFormData({ ...formData, paymentMode: v })} options={["CASH", "UPI", "CREDIT", "BANK_TRANSFER"]} />
 
-        <Input label="Village" value={formData.village} onChange={v => setFormData({ ...formData, village: v })} />
-        <Input label="District" value={formData.district} onChange={v => setFormData({ ...formData, district: v })} />
-        <Input label="State" value={formData.state} onChange={v => setFormData({ ...formData, state: v })} />
+        <Input label={t('sale.village')} value={formData.village} onChange={v => setFormData({ ...formData, village: v })} />
+        <Input label={t('sale.district')} value={formData.district} onChange={v => setFormData({ ...formData, district: v })} />
+        <Input label={t('sale.state')} value={formData.state} onChange={v => setFormData({ ...formData, state: v })} />
 
-        <Textarea label="Notes" value={formData.notes} onChange={v => setFormData({ ...formData, notes: v })} rows={3} />
+        <Textarea label={t('sale.notes')} value={formData.notes} onChange={v => setFormData({ ...formData, notes: v })} rows={3} />
 
         <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={formData.isRepeatOrder}
-            onChange={e => setFormData({ ...formData, isRepeatOrder: e.target.checked })}
-            className="w-4 h-4"
-          />
-          <span className="text-sm font-semibold text-gray-700">Repeat Order</span>
+          <input type="checkbox" checked={formData.isRepeatOrder} onChange={e => setFormData({ ...formData, isRepeatOrder: e.target.checked })} className="w-4 h-4" />
+          <span className="text-sm font-semibold text-gray-700">{t('sale.repeatOrder')}</span>
         </label>
 
-        <FileUpload label="Photos" onChange={setPhotos} accept="image/*" multiple />
+        <FileUpload label={t('sale.photos')} onChange={setPhotos} accept="image/*" multiple />
       </div>
 
       <div className="flex gap-3 mt-6">
         <button onClick={onClose} className="flex-1 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-xl font-bold transition-all">
-          Cancel
+          {t('common.cancel')}
         </button>
         <button onClick={() => setShowPreview(true)} className="flex-1 py-3 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-xl font-bold transition-all shadow-lg">
-          Preview & Save
+          {t('sale.previewSave')}
         </button>
       </div>
     </div>
@@ -785,6 +784,7 @@ function Textarea({ label, value, onChange, rows = 4 }) {
 }
 
 function FileUpload({ label, onChange, accept, multiple = false }) {
+  const { t } = useTranslation()
   const [previews, setPreviews] = useState([])
 
   const handleChange = (e) => {
@@ -827,7 +827,7 @@ function FileUpload({ label, onChange, accept, multiple = false }) {
           <label className="cursor-pointer flex-1">
             <div className="flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg font-bold text-sm hover:from-indigo-600 hover:to-purple-700 transition-all text-center">
               <Upload size={14} />
-              Gallery
+              {t('common.gallery')}
             </div>
             <input type="file" accept={accept} multiple={multiple} onChange={handleChange} className="hidden" />
           </label>
@@ -835,7 +835,7 @@ function FileUpload({ label, onChange, accept, multiple = false }) {
           <label className="cursor-pointer flex-1">
             <div className="flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-lg font-bold text-sm hover:from-emerald-600 hover:to-teal-700 transition-all text-center">
               <Camera size={14} />
-              Take Photo
+              {t('common.takePhoto')}
             </div>
             <input type="file" accept={accept} capture="environment" onChange={handleChange} className="hidden" />
           </label>
@@ -859,7 +859,7 @@ function FileUpload({ label, onChange, accept, multiple = false }) {
         )}
         {previews.length === 0 && (
           <p className="text-xs text-center text-gray-400 mt-2">
-            {multiple ? 'Multiple photos allowed · JPG, PNG, WEBP' : 'JPG, PNG, WEBP'}
+            {multiple ? t('common.multiplePhotos') : t('common.singlePhoto')}
           </p>
         )}
       </div>
@@ -870,13 +870,14 @@ function FileUpload({ label, onChange, accept, multiple = false }) {
 /* ================= MESSAGE TO ADMIN FORM ================= */
 
 function MessageToAdminForm({ onClose, currentSummary }) {
+  const { t } = useTranslation()
   const [messageText, setMessageText] = useState("")
   const [messageType, setMessageType] = useState("UPDATE")
   const [isLoading, setIsLoading] = useState(false)
 
   const handleSubmit = async () => {
     if (!messageText.trim()) {
-      alert("Please enter a message")
+      alert(t('message.messageLabel').replace(' *','') + " required")
       return
     }
 
@@ -904,12 +905,12 @@ function MessageToAdminForm({ onClose, currentSummary }) {
 
       if (!response.ok) throw new Error("Failed to send message")
 
-      alert("Message sent to admin successfully!")
+      alert(t('field.messageSent'))
       setMessageText("")
       onClose()
     } catch (err) {
       console.error("Error sending message:", err)
-      alert("Failed to send message. Please try again.")
+      alert(t('field.messageFailed'))
     } finally {
       setIsLoading(false)
     }
@@ -918,7 +919,7 @@ function MessageToAdminForm({ onClose, currentSummary }) {
   return (
     <div className="bg-white p-8 rounded-3xl shadow-2xl border-2 border-cyan-200">
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-black text-gray-800">Send Message to Admin</h2>
+        <h2 className="text-2xl font-black text-gray-800">{t('message.title')}</h2>
         <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
           <X size={24} />
         </button>
@@ -927,7 +928,7 @@ function MessageToAdminForm({ onClose, currentSummary }) {
       <div className="space-y-4">
         {/* Message Type Selector */}
         <div>
-          <label className="block text-sm font-bold text-gray-700 mb-3">Message Type</label>
+          <label className="block text-sm font-bold text-gray-700 mb-3">{t('message.messageType')}</label>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
             {["UPDATE", "ALERT", "LOCATION", "MEETING", "SALE"].map(type => (
               <button
@@ -946,11 +947,11 @@ function MessageToAdminForm({ onClose, currentSummary }) {
 
         {/* Message Text */}
         <div>
-          <label className="block text-sm font-bold text-gray-700 mb-2">Message *</label>
+          <label className="block text-sm font-bold text-gray-700 mb-2">{t('message.messageLabel')}</label>
           <textarea
             value={messageText}
             onChange={e => setMessageText(e.target.value)}
-            placeholder="Type your message here..."
+            placeholder={t('message.placeholder')}
             rows={6}
             className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200 outline-none transition-all resize-none"
           />
@@ -959,12 +960,12 @@ function MessageToAdminForm({ onClose, currentSummary }) {
 
         {/* Info Display */}
         <div className="bg-cyan-50 border-2 border-cyan-200 p-4 rounded-xl">
-          <p className="text-sm font-semibold text-gray-700 mb-2">📊 Information to be sent:</p>
+          <p className="text-sm font-semibold text-gray-700 mb-2">{t('message.infoTitle')}</p>
           <ul className="text-xs text-gray-600 space-y-1">
-            <li>✓ Your current location (GPS)</li>
-            <li>✓ Distance travelled today: {currentSummary?.distanceTraveled || 0} km</li>
-            <li>✓ Message type: {messageType}</li>
-            <li>✓ Timestamp</li>
+            <li>{t('message.infoLocation')}</li>
+            <li>{t('message.infoDistance')}{currentSummary?.distanceTraveled || 0} km</li>
+            <li>{t('message.infoType')}{messageType}</li>
+            <li>{t('message.infoTimestamp')}</li>
           </ul>
         </div>
       </div>
@@ -975,14 +976,14 @@ function MessageToAdminForm({ onClose, currentSummary }) {
           disabled={isLoading}
           className="flex-1 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-xl font-bold transition-all disabled:opacity-50"
         >
-          Cancel
+          {t('common.cancel')}
         </button>
         <button
           onClick={handleSubmit}
           disabled={isLoading || !messageText.trim()}
           className="flex-1 py-3 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white rounded-xl font-bold transition-all shadow-lg disabled:opacity-50"
         >
-          {isLoading ? "Sending..." : "Send Message"}
+          {isLoading ? t('message.sending') : t('message.send')}
         </button>
       </div>
     </div>
