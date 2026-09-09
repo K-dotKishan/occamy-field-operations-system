@@ -486,65 +486,86 @@ export async function trackLocation(req, res) {
     try {
         if (req.user.role !== "FIELD") return res.status(403).json({ error: "Only field officers allowed" })
 
-        const { lat, lng, accuracy, address, activity } = req.body
-        if (!lat || !lng) return res.status(400).json({ error: "Latitude and longitude required" })
+        // ── Coerce to numbers immediately — body.lat may arrive as string ──
+        const lat = Number(req.body.lat)
+        const lng = Number(req.body.lng)
+        const accuracy = Number(req.body.accuracy) || 0
+        const address  = req.body.address  || ""
+        const activity = req.body.activity || "TRAVEL"
 
-        // Find active attendance session (if any)
+        // Reject missing, NaN, or 0,0 default fallback coordinates
+        if (!isFinite(lat) || !isFinite(lng) || (lat === 0 && lng === 0)) {
+            console.warn(`[trackLocation] Invalid coords rejected: lat=${req.body.lat} lng=${req.body.lng}`)
+            return res.status(400).json({ error: "Valid latitude and longitude required" })
+        }
+
+        // Find active attendance session
         const attendance = await Attendance.findOne({ userId: req.user.id, endTime: null })
 
-        // Create the new location log entry
+        // Always log the location point (even without active attendance)
         const locationLog = await LocationLog.create({
             userId: req.user.id,
             attendanceId: attendance?._id || null,
-            location: { lat, lng, address: address || "" },
-            accuracy: accuracy || 0,
-            activity: activity || "TRAVEL"
+            location: { lat, lng, address },
+            accuracy,
+            activity
         })
 
-        // ── Distance accumulation ──────────────────────────────────────────
-        // Scope the previous-point lookup to the CURRENT attendance session
-        // so a GPS point from a prior session never bleeds into this one.
+        // ── Distance accumulation (only when there is an active session) ──
         if (attendance) {
+            // Look up the previous point for THIS user ordered by timestamp.
+            // We intentionally do NOT filter by attendanceId here — old logs
+            // may have been created before that field existed (null attendanceId),
+            // and excluding them would leave `lastLog` always null.
+            // Instead we scope by time: only points created AFTER this session started.
             const lastLog = await LocationLog.findOne({
-                userId: req.user.id,
-                attendanceId: attendance._id,   // same session only
-                _id: { $ne: locationLog._id }
+                userId:    req.user.id,
+                timestamp: { $gte: attendance.startTime },  // same session window
+                _id:       { $ne: locationLog._id }         // not the one we just created
             }).sort({ timestamp: -1 })
 
             if (lastLog?.location?.lat && lastLog?.location?.lng) {
-                // calculateDistance now uses the Haversine formula in metres
-                // internally, so sub-metre precision is preserved.
-                const distKm = calculateDistance(
-                    lastLog.location.lat, lastLog.location.lng,
-                    lat, lng
-                )
+                const prevLat = Number(lastLog.location.lat)
+                const prevLng = Number(lastLog.location.lng)
 
-                // Threshold: 0.5 m (0.0005 km) minimum, 5 km maximum per update
-                if (distKm > 0.0005 && distKm < 5) {
-                    // 6 decimal places = 0.001 m precision before $inc
+                // calculateDistance is now fully guarded against NaN/null/0,0
+                const distKm = calculateDistance(prevLat, prevLng, lat, lng)
+
+                console.log(`[trackLocation] user=${req.user.id} prev=(${prevLat.toFixed(5)},${prevLng.toFixed(5)}) curr=(${lat.toFixed(5)},${lng.toFixed(5)}) dist=${distKm.toFixed(6)}km`)
+
+                // Minimum 10 m (0.010 km) to filter GPS jitter
+                // Maximum 5 km per single update to catch teleport glitches
+                if (distKm >= 0.010 && distKm < 5) {
                     const increment = parseFloat(distKm.toFixed(6))
 
-                    // Atomic $inc — never overwrites, safe under concurrent updates
                     const updated = await Attendance.findByIdAndUpdate(
                         attendance._id,
                         { $inc: { totalDistance: increment } },
-                        { new: true }          // return the document AFTER update
+                        { new: true }
                     ).select("totalDistance")
+
+                    const total = parseFloat((updated?.totalDistance || 0).toFixed(3))
+                    console.log(`[trackLocation] +${increment}km → total=${total}km`)
 
                     return res.json({
                         success: true,
                         locationId: locationLog._id,
-                        totalDistance: parseFloat((updated?.totalDistance || 0).toFixed(6))
+                        totalDistance: total
                     })
+                } else if (distKm !== 0) {
+                    console.log(`[trackLocation] Skipped: dist=${distKm.toFixed(6)}km (below 10m threshold or above 5km cap)`)
                 }
+            } else {
+                // First point of the session — nothing to diff against yet
+                console.log(`[trackLocation] First location point of session ${attendance._id}`)
             }
         }
 
-        // No active attendance or movement below threshold — return current total
+        // No increment this tick — return the current accumulated total
         res.json({
             success: true,
             locationId: locationLog._id,
-            totalDistance: parseFloat((attendance?.totalDistance || 0).toFixed(6))
+            totalDistance: parseFloat((attendance?.totalDistance || 0).toFixed(3))
         })
     } catch (err) {
         console.error("Location tracking error:", err)
