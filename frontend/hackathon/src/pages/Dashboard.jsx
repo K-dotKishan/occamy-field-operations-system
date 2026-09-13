@@ -155,9 +155,17 @@ export default function Dashboard() {
       loadOrders()
     } else if (role === "FIELD") {
       // Immediately restore from localStorage to avoid flash of "no session"
+      // ONLY restore if the cached session has no endTime (was genuinely active)
       const cached = localStorage.getItem("activeAttendance")
       if (cached) {
-        try { setActiveAttendance(JSON.parse(cached)) } catch (_) {}
+        try {
+          const parsed = JSON.parse(cached)
+          if (!parsed.endTime) {
+            setActiveAttendance(parsed)
+          } else {
+            localStorage.removeItem("activeAttendance")
+          }
+        } catch (_) {}
       }
       loadFieldData()
     }
@@ -369,21 +377,25 @@ export default function Dashboard() {
         // Persist to localStorage so a hard reload doesn't flash "no session"
         localStorage.setItem("activeAttendance", JSON.stringify(data.activeAttendance))
 
-        // Auto-resume tracking if attendance is active (no endTime)
+        // Auto-resume tracking ONLY if attendance is genuinely open (no endTime)
         if (!data.activeAttendance.endTime) {
           console.log("Resuming active tracking session...")
-          // Using setTimeout to ensure startLiveTracking is available and state updates have processed
           setTimeout(() => startLiveTracking(false), 500)
+        } else {
+          // endTime is set — session is closed, never start tracking
+          setActiveAttendance(null)
+          localStorage.removeItem("activeAttendance")
         }
       } else {
-        // No active session on server -- clear any stale localStorage entry
+        // No active session on server — clear any stale localStorage entry
+        // and make sure tracking is stopped
         localStorage.removeItem("activeAttendance")
         setActiveAttendance(null)
+        stopLiveTracking()
       }
 
       // Fetch Stats Summary
       const summary = await api("/field/summary")
-      // If no active session, force distance to 0 regardless of what the summary returns
       if (!data.activeAttendance) {
         setFieldStats({ ...(summary.today || {}), distanceTraveled: 0 })
       } else {
@@ -391,10 +403,19 @@ export default function Dashboard() {
       }
     } catch (error) {
       console.error("Failed to load field data:", error)
-      // On network error, restore from localStorage so the UI doesn't reset
+      // On network error, ONLY restore from localStorage if the cached session
+      // has no endTime (i.e. was genuinely active when last persisted).
+      // This prevents a completed day from re-appearing after a Render cold start.
       const cached = localStorage.getItem("activeAttendance")
       if (cached) {
-        try { setActiveAttendance(JSON.parse(cached)) } catch (_) {}
+        try {
+          const parsed = JSON.parse(cached)
+          if (!parsed.endTime) {
+            setActiveAttendance(parsed)
+          } else {
+            localStorage.removeItem("activeAttendance")
+          }
+        } catch (_) {}
       }
     }
   }
@@ -598,7 +619,7 @@ export default function Dashboard() {
       // Stop live tracking
       stopLiveTracking()
 
-      // Clear active attendance state and localStorage
+      // Clear active attendance state and localStorage — day is permanently over
       setActiveAttendance(null)
       localStorage.removeItem("activeAttendance")
 
@@ -608,12 +629,12 @@ export default function Dashboard() {
       const dist = result?.summary?.totalDistance ?? (fieldStats?.distanceTraveled || 0)
       const hrs = result?.summary?.durationHours ?? ""
       showNotification("success", `Day ended! Distance: ${parseFloat(dist).toFixed(2)} km${hrs ? ` | Duration: ${hrs}h` : ""}. See you tomorrow.`)
-      setIsEndingDay(false)
 
     } catch (error) {
       console.error("Error ending day:", error)
       const errorMsg = error?.error || error?.message || "Unknown error"
       showNotification("error", "Failed to end day: " + errorMsg)
+    } finally {
       setIsEndingDay(false)
     }
   }
