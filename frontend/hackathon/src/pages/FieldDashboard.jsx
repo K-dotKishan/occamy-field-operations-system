@@ -84,7 +84,16 @@ export default function FieldDashboard() {
       const data = await api("/field/summary")
       if (data && data.today) {
         setSummary(data.today)
-        setActiveDay(data.today.isActive)
+        // isActive=true  → day running
+        // hasEndedToday=true → day was ended today, keep activeDay=false (don't show Start Day)
+        // both false → no session today yet, activeDay=null so Start Day shows
+        if (data.today.isActive) {
+          setActiveDay(true)
+        } else if (data.today.hasEndedToday) {
+          setActiveDay(false)  // ended — show "Day Ended" badge, not Start Day
+        } else {
+          setActiveDay(null)   // never started today — show Start Day
+        }
       }
     } catch (err) {
       console.error("Failed to load summary", err)
@@ -163,7 +172,7 @@ export default function FieldDashboard() {
 
       {/* Action Buttons */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {!activeDay ? (
+        {activeDay === null ? (
           <ActionButton
             icon={<MapPin size={24} />}
             label={t('field.startDay')}
@@ -171,13 +180,23 @@ export default function FieldDashboard() {
             color="from-blue-500 to-blue-700"
             onClick={startDay}
           />
-        ) : (
+        ) : activeDay === true ? (
           <ActionButton
             icon={<MapPin size={24} />}
             label={t('field.endDay')}
             subtitle={t('field.endDaySub')}
             color="from-red-500 to-red-700"
             onClick={endDay}
+          />
+        ) : (
+          // activeDay === false: day ended today — show disabled button so FO cannot restart
+          <ActionButton
+            icon={<MapPin size={24} />}
+            label={t('field.dayEnded')}
+            subtitle={t('field.endDaySub')}
+            color="from-gray-400 to-gray-500"
+            onClick={() => {}}
+            disabled={true}
           />
         )}
 

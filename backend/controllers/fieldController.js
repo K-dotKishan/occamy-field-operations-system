@@ -38,9 +38,18 @@ export async function getSummary(req, res) {
         // distance to persist across sessions after End Day.
         const distanceTraveled = activeAttendance ? (activeAttendance.totalDistance || 0) : 0
 
+        // Detect whether the FO has already completed a session today (started AND ended)
+        // so the frontend can permanently hide "Start Day" and show "Day Ended" instead.
+        const endedAttendanceToday = !activeAttendance
+            ? await Attendance.findOne({ userId: req.user.id, startTime: { $gte: today }, endTime: { $ne: null } })
+            : null
+        const hasEndedToday = !!endedAttendanceToday
+
         res.json({
             today: {
-                isActive: !!activeAttendance, meetings, samples,
+                isActive: !!activeAttendance,
+                hasEndedToday,
+                meetings, samples,
                 sales: salesData[0]?.count || 0, revenue: salesData[0]?.revenue || 0,
                 distanceTraveled: parseFloat(distanceTraveled.toFixed(2))
             }
