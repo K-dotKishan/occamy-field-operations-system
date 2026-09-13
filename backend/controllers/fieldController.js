@@ -33,8 +33,10 @@ export async function getSummary(req, res) {
             { $match: { userId: req.user.id, createdAt: { $gte: today } } },
             { $group: { _id: null, count: { $sum: 1 }, revenue: { $sum: "$totalAmount" } } }
         ])
-        const attendances = await Attendance.find({ userId: req.user.id, startTime: { $gte: today } })
-        const distanceTraveled = attendances.reduce((sum, att) => sum + (att.totalDistance || 0), 0)
+        // Bug 2 fix: only use the ACTIVE session's distance.
+        // Summing all today's attendances (including ended ones) caused the
+        // distance to persist across sessions after End Day.
+        const distanceTraveled = activeAttendance ? (activeAttendance.totalDistance || 0) : 0
 
         res.json({
             today: {
@@ -533,9 +535,9 @@ export async function trackLocation(req, res) {
 
                 console.log(`[trackLocation] user=${req.user.id} prev=(${prevLat.toFixed(5)},${prevLng.toFixed(5)}) curr=(${lat.toFixed(5)},${lng.toFixed(5)}) dist=${distKm.toFixed(6)}km`)
 
-                // Minimum 10 m (0.010 km) to filter GPS jitter
+                // Minimum 2 m (0.002 km) — just enough to filter stationary GPS noise
                 // Maximum 5 km per single update to catch teleport glitches
-                if (distKm >= 0.010 && distKm < 5) {
+                if (distKm >= 0.002 && distKm < 5) {
                     const increment = parseFloat(distKm.toFixed(6))
 
                     const updated = await Attendance.findByIdAndUpdate(
