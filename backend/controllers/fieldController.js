@@ -25,23 +25,32 @@ export async function getSummary(req, res) {
     try {
         if (req.user.role !== "FIELD") return res.status(403).json({ error: "Only field officers allowed" })
 
-        const today = new Date(); today.setHours(0, 0, 0, 0)
+        // Use UTC midnight boundaries to match MongoDB's UTC storage
+        // Avoids timezone mismatch (e.g. IST = UTC+5:30) where local midnight
+        // doesn't match the UTC date stored in the DB.
+        const nowUtc = new Date()
+        const todayUtcStart = new Date(Date.UTC(nowUtc.getUTCFullYear(), nowUtc.getUTCMonth(), nowUtc.getUTCDate(), 0, 0, 0, 0))
+        const todayUtcEnd   = new Date(Date.UTC(nowUtc.getUTCFullYear(), nowUtc.getUTCMonth(), nowUtc.getUTCDate(), 23, 59, 59, 999))
+
         const activeAttendance = await Attendance.findOne({ userId: req.user.id, endTime: null })
-        const meetings = await Activity.countDocuments({ userId: req.user.id, createdAt: { $gte: today } })
-        const samples = await Sample.countDocuments({ userId: req.user.id, createdAt: { $gte: today } })
+        const meetings = await Activity.countDocuments({ userId: req.user.id, createdAt: { $gte: todayUtcStart } })
+        const samples  = await Sample.countDocuments({   userId: req.user.id, createdAt: { $gte: todayUtcStart } })
         const salesData = await Sale.aggregate([
-            { $match: { userId: req.user.id, createdAt: { $gte: today } } },
+            { $match: { userId: req.user.id, createdAt: { $gte: todayUtcStart } } },
             { $group: { _id: null, count: { $sum: 1 }, revenue: { $sum: "$totalAmount" } } }
         ])
-        // Bug 2 fix: only use the ACTIVE session's distance.
-        // Summing all today's attendances (including ended ones) caused the
-        // distance to persist across sessions after End Day.
+
+        // Only show distance for the currently-active session
         const distanceTraveled = activeAttendance ? (activeAttendance.totalDistance || 0) : 0
 
-        // Detect whether the FO has already completed a session today (started AND ended)
-        // so the frontend can permanently hide "Start Day" and show "Day Ended" instead.
+        // hasEndedToday — did the FO complete a full session today?
+        // Uses strict UTC day window to avoid timezone mismatch on Render/Atlas.
         const endedAttendanceToday = !activeAttendance
-            ? await Attendance.findOne({ userId: req.user.id, startTime: { $gte: today }, endTime: { $ne: null } })
+            ? await Attendance.findOne({
+                userId:    req.user.id,
+                startTime: { $gte: todayUtcStart, $lte: todayUtcEnd },
+                endTime:   { $ne: null }
+              })
             : null
         const hasEndedToday = !!endedAttendanceToday
 
@@ -510,6 +519,13 @@ export async function trackLocation(req, res) {
             return res.status(400).json({ error: "Valid latitude and longitude required" })
         }
 
+        // Bug 3 fix: reject poor-accuracy readings on the backend as a second defence
+        // (the frontend also filters, but some callers may not)
+        if (accuracy > 0 && accuracy > 50) {
+            console.warn(`[trackLocation] Low accuracy rejected: ±${accuracy}m`)
+            return res.json({ success: true, skipped: "low_accuracy", totalDistance: 0 })
+        }
+
         // Find active attendance session
         const attendance = await Attendance.findOne({ userId: req.user.id, endTime: null })
 
@@ -544,9 +560,9 @@ export async function trackLocation(req, res) {
 
                 console.log(`[trackLocation] user=${req.user.id} prev=(${prevLat.toFixed(5)},${prevLng.toFixed(5)}) curr=(${lat.toFixed(5)},${lng.toFixed(5)}) dist=${distKm.toFixed(6)}km`)
 
-                // Minimum 2 m (0.002 km) — just enough to filter stationary GPS noise
+                // Minimum 15 m (0.015 km) — filters GPS jitter while sitting still
                 // Maximum 5 km per single update to catch teleport glitches
-                if (distKm >= 0.002 && distKm < 5) {
+                if (distKm >= 0.015 && distKm < 5) {
                     const increment = parseFloat(distKm.toFixed(6))
 
                     const updated = await Attendance.findByIdAndUpdate(

@@ -2,6 +2,20 @@ import { useEffect, useState, useRef } from "react"
 import { MapPin, Activity, AlertCircle, CheckCircle2, Zap } from "lucide-react"
 import { api } from "../api"
 
+// Inline Haversine — returns metres between two GPS points
+function distanceMetres(lat1, lon1, lat2, lon2) {
+  const R = 6371000
+  const toRad = d => d * Math.PI / 180
+  const dLat = toRad(lat2 - lat1)
+  const dLon = toRad(lon2 - lon1)
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
+// GPS drift filters
+const MAX_ACCURACY_M   = 50    // ignore readings worse than 50 m accuracy
+const MIN_DISTANCE_M   = 20    // ignore movement smaller than 20 m (jitter)
+
 export default function LiveTracking({ onLocationUpdate }) {
   const [isTracking, setIsTracking] = useState(false)
   const [location, setLocation] = useState(null)
@@ -16,6 +30,8 @@ export default function LiveTracking({ onLocationUpdate }) {
   // watchPosition fires. This prevents pool exhaustion on Atlas M0.
   const lastSentRef = useRef(0)
   const THROTTLE_MS = 10000
+  // Last confirmed position — used for drift filtering
+  const lastPositionRef = useRef(null)
 
   const startTracking = () => {
     if (!navigator.geolocation) {
@@ -34,10 +50,30 @@ export default function LiveTracking({ onLocationUpdate }) {
         setLocation({ lat: latitude, lng: longitude })
         setAccuracy(Math.round(acc))
 
+        // ── Bug 3 fix: GPS drift / jitter filters ──────────────────────
+        // 1. Reject readings with poor accuracy (indoors, weak signal)
+        if (acc > MAX_ACCURACY_M) {
+          setMessage(`⚠️ GPS accuracy too low (±${Math.round(acc)}m) — skipping`)
+          return
+        }
+
+        // 2. Reject movement smaller than MIN_DISTANCE_M (stationary noise)
+        if (lastPositionRef.current) {
+          const moved = distanceMetres(
+            lastPositionRef.current.lat, lastPositionRef.current.lng,
+            latitude, longitude
+          )
+          if (moved < MIN_DISTANCE_M) return  // silent skip — jitter, not real movement
+        }
+        // ── End drift filters ──────────────────────────────────────────
+
         // Throttle DB writes — skip if last write was less than 10s ago
         const now = Date.now()
         if (now - lastSentRef.current < THROTTLE_MS) return
         lastSentRef.current = now
+
+        // Update last confirmed position AFTER all filters pass
+        lastPositionRef.current = { lat: latitude, lng: longitude }
 
         try {
           await api("/field/location/track", "POST", {
@@ -83,6 +119,9 @@ export default function LiveTracking({ onLocationUpdate }) {
     if (trackingIntervalRef.current) {
       clearInterval(trackingIntervalRef.current)
     }
+
+    // Reset last position so next session starts fresh
+    lastPositionRef.current = null
 
     setIsTracking(false)
     setTrackingStatus("stopped")
