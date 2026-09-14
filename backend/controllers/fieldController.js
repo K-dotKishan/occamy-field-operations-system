@@ -519,11 +519,12 @@ export async function trackLocation(req, res) {
             return res.status(400).json({ error: "Valid latitude and longitude required" })
         }
 
-        // Bug 3 fix: reject poor-accuracy readings on the backend as a second defence
-        // (the frontend also filters, but some callers may not)
-        if (accuracy > 0 && accuracy > 50) {
-            console.warn(`[trackLocation] Low accuracy rejected: ±${accuracy}m`)
-            return res.json({ success: true, skipped: "low_accuracy", totalDistance: 0 })
+        // Reject poor-accuracy readings (backend second defence).
+        // Return the real current total — not 0 — so the frontend display stays accurate.
+        if (accuracy > 0 && accuracy > 100) {
+            console.warn(`[trackLocation] Low accuracy skipped: ±${accuracy}m`)
+            const att = await Attendance.findOne({ userId: req.user.id, endTime: null }).select("totalDistance")
+            return res.json({ success: true, skipped: "low_accuracy", totalDistance: parseFloat((att?.totalDistance || 0).toFixed(3)) })
         }
 
         // Find active attendance session
@@ -560,9 +561,9 @@ export async function trackLocation(req, res) {
 
                 console.log(`[trackLocation] user=${req.user.id} prev=(${prevLat.toFixed(5)},${prevLng.toFixed(5)}) curr=(${lat.toFixed(5)},${lng.toFixed(5)}) dist=${distKm.toFixed(6)}km`)
 
-                // Minimum 15 m (0.015 km) — filters GPS jitter while sitting still
-                // Maximum 5 km per single update to catch teleport glitches
-                if (distKm >= 0.015 && distKm < 5) {
+                // Minimum 10 m (0.010 km) — filters stationary GPS jitter
+                // Maximum 50 km per single update — supports fast vehicles and long gaps
+                if (distKm >= 0.010 && distKm < 50) {
                     const increment = parseFloat(distKm.toFixed(6))
 
                     const updated = await Attendance.findByIdAndUpdate(
@@ -580,7 +581,7 @@ export async function trackLocation(req, res) {
                         totalDistance: total
                     })
                 } else if (distKm !== 0) {
-                    console.log(`[trackLocation] Skipped: dist=${distKm.toFixed(6)}km (below 10m threshold or above 5km cap)`)
+                    console.log(`[trackLocation] Skipped: dist=${distKm.toFixed(6)}km (below 10m threshold or above 50km cap)`)
                 }
             } else {
                 // First point of the session — nothing to diff against yet

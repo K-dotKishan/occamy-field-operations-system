@@ -13,8 +13,8 @@ function distanceMetres(lat1, lon1, lat2, lon2) {
 }
 
 // GPS drift filters
-const MAX_ACCURACY_M   = 50    // ignore readings worse than 50 m accuracy
-const MIN_DISTANCE_M   = 20    // ignore movement smaller than 20 m (jitter)
+const MAX_ACCURACY_M = 100   // reject only extreme indoor/no-signal readings (>100m)
+const MIN_DISTANCE_M = 10    // ignore movement below 10m to filter stationary jitter
 
 export default function LiveTracking({ onLocationUpdate }) {
   const [isTracking, setIsTracking] = useState(false)
@@ -45,50 +45,58 @@ export default function LiveTracking({ onLocationUpdate }) {
 
     geolocationWatchRef.current = navigator.geolocation.watchPosition(
       async (position) => {
-        const { latitude, longitude, accuracy: acc } = position.coords
-
-        setLocation({ lat: latitude, lng: longitude })
-        setAccuracy(Math.round(acc))
-
-        // ── Bug 3 fix: GPS drift / jitter filters ──────────────────────
-        // 1. Reject readings with poor accuracy (indoors, weak signal)
-        if (acc > MAX_ACCURACY_M) {
-          setMessage(`⚠️ GPS accuracy too low (±${Math.round(acc)}m) — skipping`)
-          return
-        }
-
-        // 2. Reject movement smaller than MIN_DISTANCE_M (stationary noise)
-        if (lastPositionRef.current) {
-          const moved = distanceMetres(
-            lastPositionRef.current.lat, lastPositionRef.current.lng,
-            latitude, longitude
-          )
-          if (moved < MIN_DISTANCE_M) return  // silent skip — jitter, not real movement
-        }
-        // ── End drift filters ──────────────────────────────────────────
-
-        // Throttle DB writes — skip if last write was less than 10s ago
-        const now = Date.now()
-        if (now - lastSentRef.current < THROTTLE_MS) return
-        lastSentRef.current = now
-
-        // Update last confirmed position AFTER all filters pass
-        lastPositionRef.current = { lat: latitude, lng: longitude }
-
         try {
-          await api("/field/location/track", "POST", {
-            lat: latitude,
-            lng: longitude,
-            accuracy: acc,
-            activity: activity
-          })
+          const { latitude, longitude, accuracy: acc } = position.coords
 
-          setLastUpdate(new Date().toLocaleTimeString())
-          setMessage(`✅ Location updated at ${new Date().toLocaleTimeString()}`)
-          if (onLocationUpdate) onLocationUpdate()
+          setLocation({ lat: latitude, lng: longitude })
+          setAccuracy(Math.round(acc))
+
+          // 1. Reject only extreme accuracy failures (>100m = indoors/no signal)
+          if (acc > MAX_ACCURACY_M) {
+            setMessage(`⚠️ GPS accuracy too low (±${Math.round(acc)}m) — skipping`)
+            return
+          }
+
+          // 2. Check movement against last confirmed position
+          if (lastPositionRef.current) {
+            const moved = distanceMetres(
+              lastPositionRef.current.lat, lastPositionRef.current.lng,
+              latitude, longitude
+            )
+            if (moved < MIN_DISTANCE_M) return  // silent skip — below jitter threshold
+          }
+
+          // ── Real movement confirmed — update reference point immediately ──
+          // This MUST happen here, before the throttle check, so the next
+          // GPS ping is always compared to the latest confirmed position.
+          // Previously this was placed after the throttle, causing the
+          // reference to freeze and every subsequent ping to be skipped.
+          lastPositionRef.current = { lat: latitude, lng: longitude }
+
+          // Throttle DB writes — send at most once per 10 seconds
+          const now = Date.now()
+          if (now - lastSentRef.current < THROTTLE_MS) return
+          lastSentRef.current = now
+
+          try {
+            const res = await api("/field/location/track", "POST", {
+              lat: latitude,
+              lng: longitude,
+              accuracy: acc,
+              activity: activity
+            })
+
+            setLastUpdate(new Date().toLocaleTimeString())
+            setMessage(`✅ Location updated at ${new Date().toLocaleTimeString()}`)
+            if (onLocationUpdate) onLocationUpdate()
+          } catch (apiErr) {
+            // API error must NOT stop the watcher — just log and continue
+            console.error("Failed to track location:", apiErr)
+            setMessage("⚠️ Failed to sync location with server")
+          }
         } catch (err) {
-          console.error("Failed to track location:", err)
-          setMessage("⚠️ Failed to sync location with server")
+          // Catch any unexpected error so the watcher never silently dies
+          console.error("[LiveTracking] Unexpected error in position handler:", err)
         }
       },
       (error) => {
