@@ -271,8 +271,8 @@ export default function Dashboard() {
       (err) => console.log("GPS background error:", err.message),
       {
         enableHighAccuracy: true,
-        maximumAge: 0,
-        timeout: 30000
+        maximumAge: 15000,
+        timeout: 10000
       }
     )
 
@@ -379,7 +379,7 @@ export default function Dashboard() {
 
         // Auto-resume tracking ONLY if attendance is genuinely open (no endTime)
         if (!data.activeAttendance.endTime) {
-          console.log("Resuming active tracking session...")
+          console.log("[loadFieldData] ▶ Active session found, resuming tracking:", data.activeAttendance._id)
           setTimeout(() => startLiveTracking(false), 500)
         } else {
           // endTime is set — session is closed, never start tracking
@@ -445,6 +445,11 @@ export default function Dashboard() {
 
   /* ================= LIVE TRACKING FUNCTIONS ================= */
   const startLiveTracking = (notify = true) => {
+    // Security context check — geolocation requires HTTPS in production
+    if (!window.isSecureContext) {
+      console.warn("[LiveTracking] ⚠️ NOT a secure context (no HTTPS) — geolocation may fail on mobile")
+    }
+
     if (!navigator.geolocation) {
       if (notify) showNotification("error", "Geolocation not supported by your browser")
       return
@@ -455,6 +460,7 @@ export default function Dashboard() {
       return
     }
 
+    console.log("[LiveTracking] ▶ startLiveTracking called — isTracking was:", isTracking)
     setIsTracking(true)
 
     // Notify admin that tracking started
@@ -466,16 +472,21 @@ export default function Dashboard() {
 
     const id = navigator.geolocation.watchPosition(
       async (pos) => {
+        const { latitude, longitude, accuracy } = pos.coords
+        console.log(`[LiveTracking] 📍 GPS fix: lat=${latitude.toFixed(6)} lng=${longitude.toFixed(6)} accuracy=±${Math.round(accuracy)}m`)
+
         let currentDist = 0
 
         // Call API to track distance and persist
         try {
           const res = await api("/field/location/track", "POST", {
-            lat: pos.coords.latitude,
-            lng: pos.coords.longitude,
-            accuracy: pos.coords.accuracy,
+            lat: latitude,
+            lng: longitude,
+            accuracy: accuracy,
             activity: "TRAVEL"
           })
+
+          console.log(`[LiveTracking] ✅ API response: success=${res?.success} totalDistance=${res?.totalDistance} skipped=${res?.skipped || 'no'}`)
 
           if (res.success && res.totalDistance !== undefined) {
             currentDist = res.totalDistance
@@ -485,18 +496,18 @@ export default function Dashboard() {
             }))
           }
         } catch (e) {
-          console.error("Tracking API error:", e)
+          console.error("[LiveTracking] ❌ Tracking API error:", e)
         }
 
         const payload = {
           userId: userId,
           name: userName,
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          accuracy: pos.coords.accuracy,
+          lat: latitude,
+          lng: longitude,
+          accuracy: accuracy,
           speed: pos.coords.speed,
           heading: pos.coords.heading,
-          battery: Math.floor(Math.random() * 100), // Mock battery level
+          battery: Math.floor(Math.random() * 100),
           time: new Date().toISOString(),
           distanceTravelled: currentDist,
           totalDistance: currentDist
@@ -505,7 +516,6 @@ export default function Dashboard() {
         setLocation(payload)
         socket.emit("field-location-update", payload)
 
-        // Update map center for field officer's own view
         if (role === "FIELD") {
           setMapCenter([payload.lat, payload.lng])
           setMapZoom(18)
@@ -518,22 +528,22 @@ export default function Dashboard() {
         }
       },
       (error) => {
-        console.error("Geolocation error:", error)
+        const codeMap = { 1: "PERMISSION_DENIED", 2: "POSITION_UNAVAILABLE", 3: "TIMEOUT" }
+        console.error(`[LiveTracking] ❌ Geolocation error: code=${error.code} (${codeMap[error.code] || 'UNKNOWN'}) message=${error.message}`)
         if (notify) showNotification("error", "Unable to get location: " + error.message)
-        // Only stop tracking on permission denied (code 1) — fatal, user blocked GPS.
-        // Timeout (code 3) and position unavailable (code 2) are temporary; keep watching.
         if (error.code === 1) {
           stopLiveTracking()
         }
       },
       {
         enableHighAccuracy: true,
-        maximumAge: 0,
-        timeout: 30000
+        maximumAge: 15000,   // accept cached positions up to 15s old — prevents timeout freeze
+        timeout: 10000       // fail fast per attempt; watcher retries automatically
       }
     )
 
     setWatchId(id)
+    console.log(`[LiveTracking] ✅ watchPosition started, watchId=${id}`)
     if (notify) showNotification("success", "Live tracking started. Distance is being recorded.")
   }
 
