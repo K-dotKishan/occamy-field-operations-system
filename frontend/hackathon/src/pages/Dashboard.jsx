@@ -470,14 +470,51 @@ export default function Dashboard() {
       name: userName
     })
 
+    // ── Client-side distance accumulator ──────────────────────────────
+    // Inline Haversine — returns km between two GPS points
+    const haversineKm = (lat1, lon1, lat2, lon2) => {
+      const R = 6371
+      const toRad = d => d * Math.PI / 180
+      const dLat = toRad(lat2 - lat1), dLon = toRad(lon2 - lon1)
+      const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+    }
+    let prevPos = null          // last confirmed GPS point
+    let localDistKm = 0         // running client-side total for this session
+    const MIN_MOVE_KM = 0.005   // 5m minimum movement threshold
+    const MAX_ACC_M   = 150     // reject only extreme accuracy failures
+
     const id = navigator.geolocation.watchPosition(
       async (pos) => {
+        console.log("[GPS Ping]", pos.coords)
         const { latitude, longitude, accuracy } = pos.coords
-        console.log(`[LiveTracking] 📍 GPS fix: lat=${latitude.toFixed(6)} lng=${longitude.toFixed(6)} accuracy=±${Math.round(accuracy)}m`)
 
-        let currentDist = 0
+        // Reject only extreme accuracy failures (>150m = indoors/no signal)
+        if (accuracy > MAX_ACC_M) {
+          console.warn(`[LiveTracking] ⚠️ Low accuracy skipped: ±${Math.round(accuracy)}m`)
+          return
+        }
 
-        // Call API to track distance and persist
+        // ── Client-side distance update (immediate, no backend wait) ──
+        if (prevPos) {
+          const delta = haversineKm(prevPos.lat, prevPos.lng, latitude, longitude)
+          console.log(`[LiveTracking] 📍 delta=${(delta*1000).toFixed(1)}m accuracy=±${Math.round(accuracy)}m`)
+          if (delta >= MIN_MOVE_KM) {
+            localDistKm += delta
+            prevPos = { lat: latitude, lng: longitude }
+            // Update UI immediately — does NOT wait for backend
+            setFieldStats(prev => ({
+              ...prev,
+              distanceTraveled: parseFloat((prev?.distanceTraveled || 0) + delta).toFixed(3) * 1
+            }))
+          }
+        } else {
+          // First fix of this session — record starting point
+          prevPos = { lat: latitude, lng: longitude }
+          console.log(`[LiveTracking] 📍 First fix — starting point set: (${latitude.toFixed(6)}, ${longitude.toFixed(6)})`)
+        }
+
+        // ── Backend persist (fire-and-forget, does not block UI) ──────
         try {
           const res = await api("/field/location/track", "POST", {
             lat: latitude,
@@ -486,13 +523,14 @@ export default function Dashboard() {
             activity: "TRAVEL"
           })
 
-          console.log(`[LiveTracking] ✅ API response: success=${res?.success} totalDistance=${res?.totalDistance} skipped=${res?.skipped || 'no'}`)
+          console.log(`[LiveTracking] ✅ API: totalDistance=${res?.totalDistance} skipped=${res?.skipped || 'no'}`)
 
-          if (res.success && res.totalDistance !== undefined) {
-            currentDist = res.totalDistance
+          // Sync UI to backend total if backend has a higher value
+          // (handles resume-after-refresh where local accumulator resets)
+          if (res?.success && res?.totalDistance > 0) {
             setFieldStats(prev => ({
               ...prev,
-              distanceTraveled: res.totalDistance
+              distanceTraveled: Math.max(prev?.distanceTraveled || 0, res.totalDistance)
             }))
           }
         } catch (e) {
@@ -509,8 +547,8 @@ export default function Dashboard() {
           heading: pos.coords.heading,
           battery: Math.floor(Math.random() * 100),
           time: new Date().toISOString(),
-          distanceTravelled: currentDist,
-          totalDistance: currentDist
+          distanceTravelled: localDistKm,
+          totalDistance: localDistKm
         }
 
         setLocation(payload)
@@ -528,6 +566,7 @@ export default function Dashboard() {
         }
       },
       (error) => {
+        console.error("[GPS Error]", error)
         const codeMap = { 1: "PERMISSION_DENIED", 2: "POSITION_UNAVAILABLE", 3: "TIMEOUT" }
         console.error(`[LiveTracking] ❌ Geolocation error: code=${error.code} (${codeMap[error.code] || 'UNKNOWN'}) message=${error.message}`)
         if (notify) showNotification("error", "Unable to get location: " + error.message)
@@ -537,8 +576,8 @@ export default function Dashboard() {
       },
       {
         enableHighAccuracy: true,
-        maximumAge: 15000,   // accept cached positions up to 15s old — prevents timeout freeze
-        timeout: 10000       // fail fast per attempt; watcher retries automatically
+        maximumAge: 15000,
+        timeout: 10000
       }
     )
 
